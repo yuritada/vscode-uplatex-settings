@@ -1,0 +1,97 @@
+\documentclass{deimj}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% 必要に応じてパッケージを導入して下さい。
+%\usepackage[dvipdfm]{graphicx}
+%\usepackage{latexsym}
+%\usepackage{txfonts}
+%\usepackage[fleqn]{amsmath}
+%\usepackage[psamsfonts]{amssymb}
+%\usepackage[deluxe]{otf}
+
+% 印刷位置調整 %
+% 必要に応じて値を変更してください．
+\hoffset -10mm % <-- 左に 10mm 移動
+\voffset -10mm % <-- 上に 10mm 移動
+
+\newcommand{\AmSLaTeX}{%
+ $\mathcal A$\lower.4ex\hbox{$\!\mathcal M\!$}$\mathcal S$-\LaTeX}
+\newcommand{\PS}{{\scshape Post\-Script}}
+\def\BibTeX{{\rmfamily B\kern-.05em{\scshape i\kern-.025em b}\kern-.08em
+ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125em X}}
+
+\jtitle{DEIM Forum Class File}
+% \jsubtitle{サブタイトル} % サブタイトルを付けたいときはこの行の先頭の % を取る
+\authorlist{%
+ \authorentry[nishinosono@steng.n-univ.ac.jp]{西之園 萌絵}{Moe Nishinosono}{UnivN}% 
+ \authorentry[saikawa@eng.n-univ.ac.jp]{犀川 創平}{Sohei Saikawa}{UnivN}% 
+ \authorentry[kunieda@eng.n-univ.ac.jp]{国枝 桃子}{Momoko Kunieda}{UnivN}% 
+ \authorentry[magata@magata-lab.co.jp]{真賀田 四季}{Shiki Magata}{Mlab}% 
+}
+\affiliate[UnivN]{N大学工学部建築学科\hskip1zw
+  〒464--8603 愛知県名古屋市千種区不老町}
+ {School of Engineering, N University,
+  Furo-cho, Chikusa-ku, Nagoya-shi, Aichi 464--8603, Japan}
+\affiliate[Mlab]{真賀田研究所\hskip1zw
+  〒444--0416 愛知県西尾市一色町妃真加島1番1号}
+ {Magata Laboratory,
+  1--1 Himakajima, Isshiki-cho, Nishio-shi, Aichi 444--0416, Japan}
+
+% 同一組織で、複数のメールアドレスのドメインがある場合、
+% ダガーがずれてしまう。
+% その場合、以下のコメントアウトを解除すると、
+% 自由にダガーを設定可能であることが分かる。
+% \MailAddress{$\dagger$ nishinosono@steng.n-univ.ac.jp,
+% \{saikawa,kunieda\}@eng.n-univ.ac.jp,
+% $\dagger\dagger$magata@magata-lab.co.jp
+% }
+
+\begin{document}
+\pagestyle{empty}
+
+\begin{jabstract}
+DEIM Forum 論文フォーマット．
+\end{jabstract}
+
+\begin{jkeyword}
+DEIM，フォーマット，論文執筆の注意事項
+\end{jkeyword}
+
+\maketitle
+
+\section{1ページ目のフォーマット}
+
+1ページ目上部には，タイトルと，著者全員についての情報，すなわち，氏名，所属，住所，メールアドレスを記載して下さい．
+さらに，あらまし300字程度とキーワードをそれぞれ記述してください．
+論文番号は，著者が指定する必要はありません．
+
+\section{原稿提出枚数}
+
+ショートペーパーは2ページ以上，4ページ程度で作成してください．
+ロングペーパーは4ページ以上，8ページ程度で原稿を作成してください．
+
+\section{原稿の書き方}
+
+原稿のスタイルは，A4サイズで，9ポイントのフォントを使用し，2段組み，シングルスペースとして下さい．
+参考文献は最後に列挙して下さい~\cite{Codd1970}．
+
+% \section*{謝辞}
+% 謝辞を記載する場合はこちら．
+
+%\vspace{30mm} <- 文献が本文と近すぎるときは適宜利用してください．
+\vspace{2em}
+
+\begin{thebibliography}{99}
+\bibitem{Codd1970}
+  E. F. Codd, 
+  ``A Relational Model of Data for Large Shared Data Banks,''
+  Communications of the {ACM} (CACM), Vol. 13, No. 6, pp. 377--387, 1970.
+\end{thebibliography}
+
+% bibtexを利用する場合の例
+% \bibliographystyle{jplain}
+% \bibliography{reference}
+
+\end{document}

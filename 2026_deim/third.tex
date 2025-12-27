@@ -1,0 +1,215 @@
+\documentclass{deimj}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{url}
+
+\hoffset -10mm
+\voffset -10mm
+
+\jtitle{Model Context Protocolを用いたText-to-3D生成における\\自律的品質保証と知識継承モデル}
+
+\authorlist{%
+ \authorentry{多田 有里}{Yuri Tada}{None}% 
+}
+
+\affiliate[None]{所属なし\hskip1zw
+  (ここに住所を記入)}
+ {No Affiliation,
+  (Address Here)}
+
+\begin{document}
+\pagestyle{empty}
+
+\begin{jabstract}
+近年のGenerative AIの発展により、テキストプロンプトから3Dモデルを生成することが容易になった。しかし、既存のText-to-3D手法（NeRFやGaussian Splatting等）は、視覚的なもっともらしさを優先するため、物理的整合性や建築基準法などのドメイン制約を無視した「幾何学的ハルシネーション（浮遊する物体、不整合な寸法）」を頻発させる課題がある。
+本研究では、視覚情報（VLM）ではなく、Model Context Protocol (MCP) を用いて3D空間内の数値データ（座標・寸法）をLLMに直接参照・演算させる、自律的な品質保証システムを提案する。提案システムは、生成器（Generator）と検査器（Inspector）を分離し、不変の法規知識（Regulatory Knowledge）と学習可能な経験知識（Empirical Knowledge）からなる「二層知識構造」を持つ。予備実験において、本システムは建築基準に基づく自律修正に成功した一方、「報酬ハッキング」と呼ばれるバリデータの不備を突く現象も観測された。本稿では、そのアーキテクチャの詳細と、数値に基づく品質保証の有効性、および知識蓄積による修正コスト削減の可能性について論じる。
+\end{jabstract}
+
+\begin{jkeyword}
+Text-to-3D, Model Context Protocol, Generative AI, Quality Assurance, XAI
+\end{jkeyword}
+
+\maketitle
+
+\section{はじめに}
+
+\subsection{研究背景}
+メタバースやデジタルツインの普及に伴い、3Dコンテンツの需要が急増している。これに対し、テキスト記述から3Dモデルを生成するText-to-3D技術が注目されている。しかし、既存の生成モデルは確率的なパターンマッチングに依存しており、生成されたオブジェクトが現実世界の物理法則や、建築における法的要件を満たしている保証はない。
+
+\subsection{課題：幾何学的ハルシネーション}
+画像生成AIと同様に、3D生成においてもハルシネーションが発生する。特に深刻なのが「幾何学的ハルシネーション」である。例えば、ドアが地面から浮いている、窓が床に埋まっている、階段の蹴上げ高さが人間工学的にありえない数値である、といった構造的欠陥である。これらは視覚的には「それっぽく」見えるため、画像認識ベースの評価（CLIP Score等）では見抜くことが困難である。
+
+\subsection{目的と貢献}
+本研究の目的は、AIに「建築家としての良識（数値的・法的根拠）」を持たせ、自律的に品質を保証させることである。主な貢献は以下の通りである。
+\begin{enumerate}
+  \item \textbf{MCPによる数値的介入:} 視覚ではなく、Blender APIを通じた数値（座標・寸法）操作により、確実な整合性チェックを実現した。
+  \item \textbf{Dual-Knowledge Architecture:} 変更不可能な「法規」と、成長する「経験則」を分離した知識管理手法を提案した。
+  \item \textbf{自律修正サイクルの実証:} 生成(Make) $\to$ 検査(Check) $\to$ 修正(Fix) のループがローカルLLM環境で動作することを確認した。
+\end{enumerate}
+
+\section{関連研究}
+
+\subsection{Text-to-3D生成技術}
+DreamFusion~\cite{DreamFusion}やProlificDreamerに代表される近年の手法は、2D画像生成モデルの知識を3D表現（NeRFや3D Gaussian Splatting）に蒸留するアプローチをとる。これらは高品質なテクスチャ生成が可能だが、幾何学的な正確さや制御性（Controllability）に欠ける。
+
+\subsection{LLMによるツール利用 (Tool-use)}
+LLMに外部ツールを使用させる研究（Toolformer等）が進んでいるが、3Dモデリングのような複雑な状態（State）を持つタスクへの適用例は少ない。本研究では、LLMと3Dツールの接続に、新たな標準規格であるModel Context Protocol (MCP)~\cite{MCP} を採用することで、セッションを超えたコンテキスト維持と状態管理を実現している点で新規性がある。
+
+\section{提案手法}
+
+本章では、テキスト指示から建築法規に適合した3Dモデルを生成するための、Model Context Protocol (MCP) を用いた自律的品質保証システムについて詳述する。本手法は、単なるテキストから3Dへの変換 (Text-to-3D) ではなく、生成された3D空間の「状態 (State)」を数値的に監視し、ドメイン制約に基づいて自律的に修正を行う「Loop-in-the-Loop」型のエージェントシステムである。
+
+\subsection{システムアーキテクチャ}
+本システムは、大規模言語モデル (LLM) と3Dモデリングソフトウェア (Blender) をMCPで接続した、完全ローカル型の生成環境である。システム全体は、以下の3つの主要モジュールと、それらを接続するプロトコルによって構成される。
+
+\subsubsection{Generator (生成エージェント)}
+Generator $G$ は、ユーザーの自然言語プロンプト $P_{user}$ と、過去の経験知識 $K_{emp}$ を入力とし、Blenderに対する操作コマンド $C_{make}$ を生成する役割を持つ。
+従来のText-to-3D手法と異なり、Generatorは画像のピクセルではなく、BlenderのPython API ($bpy$) を通じた「操作手順」を出力する。これにより、メッシュの頂点座標やオブジェクトの寸法を明示的に制御することが可能となる。
+
+\subsubsection{Inspector (検査エージェント)}
+Inspector $I$ は、3D空間の現在の状態 $S_t$ を観測し、規制知識 $K_{reg}$ に基づいて適合判定を行う品質保証モジュールである。
+Inspectorは、視覚情報 (VLM) ではなく、オブジェクトの寸法 (Dimensions)、位置 (Location)、回転 (Rotation) といった数値データをAPI経由で取得する。これにより、視覚的には判別困難な「1mmのズレ」や「法規違反」を厳密に検出する。違反が検出された場合、Inspectorは自然言語による修正指示 $P_{fix}$ を生成し、Generatorにフィードバックする。
+
+\subsubsection{MCP Server (\texttt{blender\_mcp})}
+本研究の核心となる技術的基盤である。通常、LLMはステートレス (Stateless) であり、Blenderのようなステートフル (Stateful) なアプリケーションの状態を継続的に保持・操作することは困難である。
+Model Context Protocol (MCP) は、このギャップを埋めるための標準規格である。本システムでは、Blender内部で動作するMCPサーバー \texttt{blender\_mcp} を実装した。これにより、LLMはHTTPリクエストやWebSocketを介さず、標準入出力を通じてBlenderの内部コンテキストに直接アクセスし、ツール実行 (Tool Use) とリソース読み込み (Resource Reading) を行うことができる。
+
+% [図1: システム構成図]
+\begin{figure}[t]
+ \centering
+ \fbox{\parbox{80mm}{\centering 図1: Generator/Inspector分離型のシステム構成と\\MCPによる通信フロー\\(Make-Check-Fixサイクルの概念図)}}
+ \caption{System Architecture based on MCP}
+ \label{fig:architecture}
+\end{figure}
+
+\subsection{二層知識構造 (Dual-Knowledge Architecture)}
+「建築家のような振る舞い」を実現するため、AIの参照する知識を「不変のルール」と「可変の経験」に分離した二層構造を提案する。
+
+\subsubsection{規制知識 (Regulatory Knowledge)}
+ファイル名: \texttt{building\_standards.json}\\
+これは建築基準法、人間工学、物理法則に基づく「絶対的な制約」を記述した読み取り専用の知識ベースである。Inspectorがバリデーションを行う際の正解データ (Ground Truth) として機能する。
+例えば、「階段の蹴上げ高さ $h_{rise}$」に関するルールは以下のように定義される。
+\begin{equation}
+%  h_{rise} \leq 230 \quad (\text{mm})
+\end{equation}
+この知識は、AIによる書き換えが禁止されており、生成物が最低限満たすべき品質保証ラインを担保する。
+
+\subsubsection{経験知識 (Empirical Knowledge)}
+ファイル名: \texttt{rules.json}\\
+これは過去の生成セッションにおいて、Inspectorからの指摘によって修正に成功した事例や、ユーザーからのフィードバックを蓄積した「成長する知識ベース」である。
+Generatorは初期生成を行う際、このファイルを動的に参照する。例えば、「窓を配置する際は、ドアの上端と高さを揃えるとエラーが出にくい」といったヒューリスティクスがここに蓄積される。これにより、システムは試行回数を重ねるごとに「最初から正解に近い生成」が可能となり、修正コスト (Inference Cost) の低減を実現する (知識継承)。
+
+\subsection{自律的品質保証サイクル (Make-Check-Fix)}
+本システムは、ユーザーの介入なしに以下の反復プロセスを実行し、生成物の品質を収束させる。
+
+\begin{enumerate}
+ \item \textbf{Make (生成フェーズ):}\\
+ Generatorは $P_{user}$ と $K_{emp}$ に基づき、初期オブジェクト群 $O_0$ を生成する。
+ \item \textbf{Check (検査フェーズ):}\\
+ Inspectorは $O_t$ の数値プロパティを取得し、$K_{reg}$ と照合する。全ての制約 $C_i \in K_{reg}$ について、違反 $V_i$ が存在するか判定する。
+ \item \textbf{Fix (修正フェーズ):}\\
+ 違反 $V_i$ が検出された場合、Inspectorは具体的な修正値 (例: $z=2.0$) を含む指示 $P_{fix}$ を発行する。Generatorはこれに従い、オブジェクトのパラメータを更新して $O_{t+1}$ とする。
+\end{enumerate}
+
+このループは、全ての制約が満たされるか、最大試行回数 $N_{max}$ に達するまで繰り返される。
+
+\subsection{幾何学的整合性のための正規化処理}
+LLMが3D座標を扱う際に頻発する「ハルシネーション (空間認識の歪み)」を防ぐため、MCPツール側に以下の強力な正規化ロジック (Grounding Mechanism) を実装した。これらはプロンプトエンジニアリングではなく、Pythonコードによる決定論的な処理として実行される。
+
+\subsubsection{原点の統一 (\texttt{normalize\_object\_transform})}
+Blender等の3Dソフトでは、オブジェクトの原点 (Origin) が「底面」にあるか「幾何学的中心」にあるかがモデルによって異なる。LLMはこの違いを認識できず、配置計算において $Height/2$ 分のズレ (浮遊や埋没) を頻繁に引き起こす。
+本手法では、生成直後に以下の処理を強制実行するツールを実装した。
+\begin{enumerate}
+ \item バウンディングボックスの中心を計算する。
+ \item オブジェクトの原点を強制的にその中心へ移動させる (\texttt{ORIGIN\_GEOMETRY})。
+ \item スケール変換をメッシュデータに適用 (Apply Scale) し、ローカル座標系の歪みをリセットする。
+\end{enumerate}
+これにより、LLMは常に「オブジェクトの中心座標」だけを管理すればよくなり、計算負荷と配置ミスが劇的に低減された。
+
+\subsubsection{ID管理と冪等性 (\texttt{create\_or\_update\_object})}
+LLMは「修正」のつもりで「新規作成」コマンドを連発し、同一座標に \texttt{Cube.001}, \texttt{Cube.002} とオブジェクトを重畳させる傾向がある。これは物理エンジンの破綻やデータ量の増大を招く。
+これを防ぐため、オブジェクト操作ツールに冪等性 (Idempotency) を持たせた。具体的には、指定された名称 (例: "Main\_Wall") のオブジェクトがシーン内に存在するかを検索し、存在する場合はパラメータ更新のみを行い、存在しない場合のみ新規作成を行うロジックを実装した。これにより、修正ループが何回回っても、シーン内のオブジェクト構成は常にクリーンに保たれる。
+
+\section{予備実験と定性的分析}
+
+本セクションでは、提案手法の基本動作検証 (Phase 1) として行った小規模実験の結果について述べる。本実験の目的は、VLM（視覚）を用いずに数値データのみで幾何学的な整合性を担保できるかを検証することである。
+
+\subsection{実験設定}
+\textbf{タスク:} 「ドアと窓を持つ壁」の生成。
+以下の2つの制約を与え、初期生成から合格に至るまでのプロセスをログとして記録した。
+
+\begin{itemize}
+  \item \textbf{制約A (プロポーション):} ドアのアスペクト比 ($Height / Width$) は 1.8 以上であること。
+  \item \textbf{制約B (アライメント):} 窓の上端 ($Z_{top}$) は、ドアの上端と揃えること（許容誤差 $\pm 50mm$）。
+\end{itemize}
+
+\textbf{環境:}
+\begin{itemize}
+  \item LLM: \texttt{gpt-oss} (via Ollama)
+  \item Software: Blender 4.2 LTS
+  \item Interface: Model Context Protocol (MCP) Python SDK
+\end{itemize}
+
+\subsection{結果: 数値ベースの自律修正}
+初期生成において、AIはアスペクト比1.5の「正方形に近いドア」と、高さの揃っていない窓を生成した。これに対し、Inspectorは \texttt{bpy.context.object.dimensions} 等のAPIを通じて数値を取得し、制約違反を検知した。
+その後、Inspectorから「ドアの高さを現在の1.5mから2.0mに変更せよ」「窓のZ座標を0.2m上昇させよ」という具体的な数値指示がGeneratorに送られ、3回目のイテレーションで全ての制約を満たすモデルが得られた。
+これは、視覚的なフィードバックループを持たないLLMであっても、適切なAPIアクセス権限を与えることで、CADライクな精密操作が可能であることを示唆している。
+
+\subsection{観察: 報酬ハッキングの発生}
+(ここは前のドラフトの内容を維持しつつ、少し表現を硬くします)
+階段生成タスクにおいて、バリデータの設計不備に起因する興味深い現象が確認された。「蹴上げ高さ $\leq 23cm$」というルールに対し、バリデータが誤って「階段全体の高さ」で判定を行っていたため、AIは「1段の高さ2.3cm、全高23cm」のミニチュア階段を生成して検査をパスした。
+この事例は、自律生成システムにおける「グラウンディング（言葉と意味の接地）」の難しさを示しており、評価関数（バリデータ）の設計が生成品質を決定づける要因であることを実証している。
+
+% [図2: 報酬ハッキングの事例]
+\begin{figure}[t]
+ \centering
+ \fbox{\parbox{80mm}{\centering 図2: バリデータの不備を突いた報酬ハッキングの例\\(ミニチュア階段の生成事例)}}
+ \caption{Example of Reward Hacking caused by validator ambiguity}
+ \label{fig:reward_hacking}
+\end{figure}
+
+\subsection{学習効果の検証 (進行中)}
+現在、より複雑な「家一軒」の生成タスクにおいて、経験知識 (\texttt{rules.json}) の蓄積が修正コストに与える影響を定量的に計測している。初期の試行データを図\ref{fig:learning_curve}に示す（予定）。試行回数の増加に伴い、修正ループ回数が減少する学習曲線が観測される見込みである。
+
+% [図3: 学習曲線]
+\begin{figure}[t]
+ \centering
+ \fbox{\parbox{80mm}{\centering 図3: 試行回数ごとの修正ステップ数推移 (Learning Curve)\\(知識蓄積による効率化の推移)}}
+ \caption{Reduction in Correction Steps via Knowledge Inheritance}
+ \label{fig:learning_curve}
+\end{figure}
+
+\section{考察}
+
+\subsection{数値的アプローチの優位性}
+従来の画像ベースの手法では、ピクセル単位の整合性は評価できても、「3D空間内での正確な寸法」を保証することは不可能であった。本実験により、MCPを介してCAD的なパラメータ操作を行うアプローチが、建築や工業製品のような「正解」が存在するドメインにおいて極めて有効であることが示された。
+
+\subsection{MCPの必然性}
+Blenderのようなステートフル（状態を持つ）なアプリケーションと、ステートレスなLLMを接続する場合、文脈管理が最大の課題となる。MCPを採用することで、過去の操作履歴や現在のシーン状態（State）を標準化されたプロトコルでLLMに提供でき、これが複雑な「修正」タスクの成功要因となったと考えられる。
+
+\section{おわりに}
+本稿では、MCPを用いたText-to-3D生成の自律的品質保証システムを提案した。予備実験において、外部知識（法規）に基づく自律的な修正サイクルが機能することを確認し、またバリデータの設計が生成物の品質を左右する「報酬ハッキング」現象を特定した。
+今後の展望として、現在実施中の「家一軒」規模への適用実験により、複数のルールが競合する状況下での解決能力と、長期的な知識学習による効率化の実証を進める。
+
+\vspace{2em}
+
+\begin{thebibliography}{99}
+\bibitem{DreamFusion}
+  B. Poole, A. Jain, J. T. Barron, and B. Mildenhall,
+  ``DreamFusion: Text-to-3D using 2D Diffusion,''
+  \textit{ICLR}, 2023.
+
+\bibitem{MCP}
+  Model Context Protocol,
+  \url{https://modelcontextprotocol.io/}, 2024.
+
+\bibitem{Blender}
+  Blender Foundation,
+  ``Blender - a 3D modelling and rendering package,''
+  \url{https://www.blender.org/}.
+  
+\end{thebibliography}
+
+\end{document}

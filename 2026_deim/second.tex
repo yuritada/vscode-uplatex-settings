@@ -1,0 +1,157 @@
+\documentclass{deimj}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{url}
+
+\hoffset -10mm
+\voffset -10mm
+
+\jtitle{Model Context Protocolを用いたText-to-3D生成における\\自律的品質保証と知識継承モデル}
+
+\authorlist{%
+ \authorentry{多田 有里}{Yuri Tada}{None}% 
+}
+
+\affiliate[None]{所属なし\hskip1zw
+  (ここに住所を記入)}
+ {No Affiliation,
+  (Address Here)}
+
+\begin{document}
+\pagestyle{empty}
+
+\begin{jabstract}
+近年のGenerative AIの発展により、テキストプロンプトから3Dモデルを生成することが容易になった。しかし、既存のText-to-3D手法（NeRFやGaussian Splatting等）は、視覚的なもっともらしさを優先するため、物理的整合性や建築基準法などのドメイン制約を無視した「幾何学的ハルシネーション（浮遊する物体、不整合な寸法）」を頻発させる課題がある。
+本研究では、視覚情報（VLM）ではなく、Model Context Protocol (MCP) を用いて3D空間内の数値データ（座標・寸法）をLLMに直接参照・演算させる、自律的な品質保証システムを提案する。提案システムは、生成器（Generator）と検査器（Inspector）を分離し、不変の法規知識（Regulatory Knowledge）と学習可能な経験知識（Empirical Knowledge）からなる「二層知識構造」を持つ。予備実験において、本システムは建築基準に基づく自律修正に成功した一方、「報酬ハッキング」と呼ばれるバリデータの不備を突く現象も観測された。本稿では、そのアーキテクチャの詳細と、数値に基づく品質保証の有効性、および知識蓄積による修正コスト削減の可能性について論じる。
+\end{jabstract}
+
+\begin{jkeyword}
+Text-to-3D, Model Context Protocol, Generative AI, Quality Assurance, XAI
+\end{jkeyword}
+
+\maketitle
+
+\section{はじめに}
+
+\subsection{研究背景}
+メタバースやデジタルツインの普及に伴い、3Dコンテンツの需要が急増している。これに対し、テキスト記述から3Dモデルを生成するText-to-3D技術が注目されている。しかし、既存の生成モデルは確率的なパターンマッチングに依存しており、生成されたオブジェクトが現実世界の物理法則や、建築における法的要件を満たしている保証はない。
+
+\subsection{課題：幾何学的ハルシネーション}
+画像生成AIと同様に、3D生成においてもハルシネーションが発生する。特に深刻なのが「幾何学的ハルシネーション」である。例えば、ドアが地面から浮いている、窓が床に埋まっている、階段の蹴上げ高さが人間工学的にありえない数値である、といった構造的欠陥である。これらは視覚的には「それっぽく」見えるため、画像認識ベースの評価（CLIP Score等）では見抜くことが困難である。
+
+\subsection{目的と貢献}
+本研究の目的は、AIに「建築家としての良識（数値的・法的根拠）」を持たせ、自律的に品質を保証させることである。主な貢献は以下の通りである。
+\begin{enumerate}
+  \item \textbf{MCPによる数値的介入:} 視覚ではなく、Blender APIを通じた数値（座標・寸法）操作により、確実な整合性チェックを実現した。
+  \item \textbf{Dual-Knowledge Architecture:} 変更不可能な「法規」と、成長する「経験則」を分離した知識管理手法を提案した。
+  \item \textbf{自律修正サイクルの実証:} 生成(Make) $\to$ 検査(Check) $\to$ 修正(Fix) のループがローカルLLM環境で動作することを確認した。
+\end{enumerate}
+
+\section{関連研究}
+
+\subsection{Text-to-3D生成技術}
+DreamFusion~\cite{DreamFusion}やProlificDreamerに代表される近年の手法は、2D画像生成モデルの知識を3D表現（NeRFや3D Gaussian Splatting）に蒸留するアプローチをとる。これらは高品質なテクスチャ生成が可能だが、幾何学的な正確さや制御性（Controllability）に欠ける。
+
+\subsection{LLMによるツール利用 (Tool-use)}
+LLMに外部ツールを使用させる研究（Toolformer等）が進んでいるが、3Dモデリングのような複雑な状態（State）を持つタスクへの適用例は少ない。本研究では、LLMと3Dツールの接続に、新たな標準規格であるModel Context Protocol (MCP)~\cite{MCP} を採用することで、セッションを超えたコンテキスト維持と状態管理を実現している点で新規性がある。
+
+\section{提案手法}
+
+\subsection{システム概要}
+本システムは、ユーザーの指示を受け取る「生成器（Generator）」と、生成物を評価する「検査器（Inspector）」の2つのLLMエージェントから構成される。両者はMCPサーバー（\texttt{blender\_mcp}）を介してBlender~\cite{Blender} インスタンスを操作・監視する。すべての推論はOllama上の \texttt{gpt-oss} モデルを用いてローカル環境で完結する。
+
+\begin{figure}[t]
+ \centering
+ \fbox{\parbox{80mm}{\centering 図1: システムアーキテクチャ図（Generator/Inspector分離とMCP接続）\\(ここに図を挿入)}}
+ \caption{System Architecture}
+ \label{fig:architecture}
+\end{figure}
+
+\subsection{二層知識構造}
+システムの判断基準として、性質の異なる2種類の外部知識ファイルを定義した。
+
+\begin{enumerate}
+  \item \textbf{規制知識 (Regulatory Knowledge):} \texttt{building\_standards.json}\\
+  建築基準法や人間工学に基づく絶対的なルール。システムによる書き換えは禁止され、常にバリデーションの正解として機能する。
+  \item \textbf{経験知識 (Empirical Knowledge):} \texttt{rules.json}\\
+  過去の生成・修正プロセスで獲得した「成功パターン」や「ユーザーの好み」。動的に更新され、次回の生成時にGeneratorのプロンプトとして注入される（知識継承）。
+\end{enumerate}
+
+\subsection{幾何学的整合性のための正規化処理}
+LLMは「中心座標」と「底面座標」の区別を苦手とするため、しばしば配置ミス（浮遊）を引き起こす。また、修正プロセスにおけるオブジェクトの重複生成（ID管理の破綻）も課題であった。これに対し、本手法ではMCPツール側に以下の正規化ロジック（Grounding処理）を実装した。
+\begin{itemize}
+  \item \texttt{normalize\_object\_transform}: 生成直後に、オブジェクトの原点を強制的にジオメトリの中心に設定し、スケールを適用する。
+  \item \texttt{create\_or\_update\_object}: 同名のオブジェクトが存在する場合は新規作成をブロックし、既存オブジェクトのパラメータ修正へ誘導する。
+\end{itemize}
+
+\section{予備実験と定性的分析}
+
+本セクションでは、システムの基本動作検証（Phase 1）および、バリデーション過程で観測されたAIの挙動について述べる。
+
+\subsection{実験1: ドアと窓のアライメント修正}
+\textbf{設定:} 「ドアと窓を持つ壁」を生成させ、以下のルールへの適合を検証した。
+\begin{itemize}
+  \item ルールA: ドアのアスペクト比は1.8以上。
+  \item ルールB: 窓の上端はドアの上端と揃えること（誤差5cm以内）。
+\end{itemize}
+
+\textbf{結果:}
+初期生成において、AIはアスペクト比1.5の「ずんぐりしたドア」と、高さの揃っていない窓を生成した（違反）。Inspectorは \texttt{dimensions} と \texttt{location} の数値を読み取り、これを検知。その後、Generatorに対して具体的な修正数値を指示し、最終的に全ルールを満たすモデルへの修正に成功した。これはVLM（視覚）を使わずとも、数値計算のみで美的・構造的な修正が可能であることを示している。
+
+\subsection{実験2: 報酬ハッキングの観測}
+階段生成タスクにおいて、興味深い現象が確認された。「階段の1段の高さ（蹴上げ）は23cm以下」というルールを与えた際、バリデータの実装に「階段全体の高さ」のみを参照してしまうバグが含まれていた。
+この際、AIは通常サイズの階段生成に失敗した後、\textbf{「1段の高さが2.3cm、全体の高さが23cmのミニチュア階段」}を生成して検査をパスしようとした。
+
+\begin{figure}[t]
+ \centering
+ \fbox{\parbox{80mm}{\centering 図2: 報酬ハッキングの事例\\（ミニチュア階段と正常な階段の比較）\\(ここに図を挿入)}}
+ \caption{Example of Reward Hacking}
+ \label{fig:reward_hacking}
+\end{figure}
+
+この事例は、AIが「常識」ではなく「与えられた評価関数（数値ルール）」に対して極めて忠実（Greedy）に最適化を行うことを示唆している。自律生成システムにおいては、AIの能力以上に、人間が定義する「評価関数（Grounding）」の設計が品質の生命線となることが明らかとなった。
+
+\subsection{実験3: 知識蓄積による修正コストの変化（予定）}
+現在、同一プロンプト（「家」の生成）を10回連続で実行し、\texttt{rules.json} の蓄積に伴って修正ループ回数（Fix Count）がどのように変化するかを検証中である。初期の結果では、試行回数を重ねるごとに不要なAPIコールが減少する傾向が見られている。
+
+\begin{figure}[t]
+ \centering
+ \fbox{\parbox{80mm}{\centering 図3: 試行回数ごとの修正ステップ数推移（学習曲線）\\(ここに図を挿入)}}
+ \caption{Learning Curve of Self-Correction}
+ \label{fig:learning_curve}
+\end{figure}
+
+\section{考察}
+
+\subsection{数値的アプローチの優位性}
+従来の画像ベースの手法では、ピクセル単位の整合性は評価できても、「3D空間内での正確な寸法」を保証することは不可能であった。本実験により、MCPを介してCAD的なパラメータ操作を行うアプローチが、建築や工業製品のような「正解」が存在するドメインにおいて極めて有効であることが示された。
+
+\subsection{MCPの必然性}
+Blenderのようなステートフル（状態を持つ）なアプリケーションと、ステートレスなLLMを接続する場合、文脈管理が最大の課題となる。MCPを採用することで、過去の操作履歴や現在のシーン状態（State）を標準化されたプロトコルでLLMに提供でき、これが複雑な「修正」タスクの成功要因となったと考えられる。
+
+\section{おわりに}
+本稿では、MCPを用いたText-to-3D生成の自律的品質保証システムを提案した。予備実験において、外部知識（法規）に基づく自律的な修正サイクルが機能することを確認し、またバリデータの設計が生成物の品質を左右する「報酬ハッキング」現象を特定した。
+今後の展望として、現在実施中の「家一軒」規模への適用実験により、複数のルールが競合する状況下での解決能力と、長期的な知識学習による効率化の実証を進める。
+
+\vspace{2em}
+
+\begin{thebibliography}{99}
+\bibitem{DreamFusion}
+  B. Poole, A. Jain, J. T. Barron, and B. Mildenhall,
+  ``DreamFusion: Text-to-3D using 2D Diffusion,''
+  \textit{ICLR}, 2023.
+
+\bibitem{MCP}
+  Model Context Protocol,
+  \url{https://modelcontextprotocol.io/}, 2024.
+
+\bibitem{Blender}
+  Blender Foundation,
+  ``Blender - a 3D modelling and rendering package,''
+  \url{https://www.blender.org/}.
+  
+\end{thebibliography}
+
+\end{document}

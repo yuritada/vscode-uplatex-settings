@@ -14,3 +14,6 @@
 # ただし、imageに入っているpdfは保存する
 !**/image/*.pdf
 !**/images/*.pdf
+
+latexmkrc
+reference.bib
