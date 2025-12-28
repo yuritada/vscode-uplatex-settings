@@ -1,14 +1,18 @@
-\documentclass{deimj}
+\documentclass[dvipdfmx, a4paper, 9pt]{deimj}
 
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
-\usepackage[dvipdfmx]{graphicx}
+\usepackage{graphicx}
 \usepackage{url}
+\usepackage{bmpsize}
 
 % TikZ関連パッケージ（図1・図2用）
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds}
 
+% 論文なら十中八九使うであろう追加パッケージ（推奨）
+\usepackage{amsmath, amssymb} % 数式用
+\usepackage{bm}              % 太字ベクトル用
 % 印刷位置調整
 \hoffset -10mm
 \voffset -10mm
@@ -362,10 +366,11 @@ Blender側には専用のアドオンが常駐する。このアドオンは、�
 実験全体を通じて、知識の蓄積に伴う顕著な学習効果が確認された。図\ref{fig:learning_curve}に、各セッションにおける総トークン数と所要ターン数の推移を示す。
 
 \begin{figure}[t]
- \centering
- \includegraphics[width=\columnwidth]{image/Fig3_Learning_Curve.png}
- \caption{学習に伴うコストの削減（累積トークンとターン数）}
- \label{fig:learning_curve}
+    \begin{center}
+        \includegraphics[width=7cm]{image/Fig3_Learning_Curve.png}
+        \caption{学習に伴うコストの削減（累積トークンとターン数）}
+        \label{fig:learning_curve}
+    \end{center}
 \end{figure}
 
 \subsubsection{試行錯誤から即時解決への推移}
