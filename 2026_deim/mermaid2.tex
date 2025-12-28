@@ -40,22 +40,22 @@
       \node (T3)  [tools] at ($(Origin) + (0, -3.2)$) {{\tightlabel{\mbox{T3: 検査}}}};
       \node (T4)  [tools] at ($(Origin) + (2.2, -3.2)$) {{\tightlabel{\mbox{T4: 知識}}}};
       
-      \node (SocketBridge) [mcp] at ($(Origin) + (0, -4.2)$) {{\tightlabel{\mbox{通信ブリッジ}}}};
+      \node (SocketBridge) [mcp] at ($(Origin) + (-1.5, -4.2)$) {{\tightlabel{\mbox{通信ブリッジ}}}};
 
       % --- 3. Data Storage (x=2.2付近に寄せる) ---
       \node (StaticDB) [storage] at ($(Origin) + (2, 0)$) {{\tightlabel{\mbox{StaticDB}}}};
       \node (DynamicDB) [storage] at ($(Origin) + (2, -0.9)$) {{\tightlabel{\mbox{DynamicDB}}}};
 
       % --- 4. Blender Process (中央軸 x=0) ---
-      \node (SocketListener) [addon] at ($(Origin) + (0, -5.3)$) {{\tightlabel{\mbox{ソケットリスナー}}}};
-      \node (Router) [addon] at ($(Origin) + (0, -6.1)$) {{\tightlabel{\mbox{コマンドルーター}}}};
+      \node (SocketListener) [addon] at ($(Origin) + (-1.5, -5.3)$) {{\tightlabel{\mbox{ソケットリスナー}}}};
+      \node (Router) [addon] at ($(Origin) + (1.5, -5.3)$) {{\tightlabel{\mbox{コマンドルーター}}}};
       
-      \node (H_Exec) [addon] at ($(Origin) + (-1.5, -7.1)$) {{\tightlabel{\mbox{操作実行ハンドラ}}}};
-      \node (H_Insp) [addon] at ($(Origin) + (1.5, -7.1)$) {{\tightlabel{\mbox{シーン解析ハンドラ}}}};
+      \node (H_Exec) [addon] at ($(Origin) + (-1.5, -6.2)$) {{\tightlabel{\mbox{操作実行ハンドラ}}}};
+      \node (H_Insp) [addon] at ($(Origin) + (1.5, -6.2)$) {{\tightlabel{\mbox{シーン解析ハンドラ}}}};
       
-      \node (BPY) [blender_proc] at ($(Origin) + (-1.5, -8.1)$) {{\tightlabel{\mbox{Blender API (bpy)}}}};
-      \node (SceneData) [blender_proc] at ($(Origin) + (-1.5, -9.0)$) {{\tightlabel{\mbox{シーン状態データ}}}};
-      \node (BlenderEnv) [blender_proc] at ($(Origin) + (1.5, -9.0)$) {{\tightlabel{\mbox{ビューポート(GUI)}}}};
+      \node (BPY) [blender_proc] at ($(Origin) + (-1.25, -7.1)$) {{\tightlabel{\mbox{Blender API (bpy)}}}};
+      \node (SceneData) [blender_proc] at ($(Origin) + (-1.5, -8.0)$) {{\tightlabel{\mbox{シーン状態データ}}}};
+      \node (BlenderEnv) [blender_proc] at ($(Origin) + (1.5, -8.0)$) {{\tightlabel{\mbox{ビューポート(GUI)}}}};
 
 
       % --- Background Layers (subgraphs) ---
@@ -67,8 +67,8 @@
           \node (MCP_Box) [group, fit=(FastMCP) (T12) (T4) (SocketBridge), label={[group_label,xshift=-0.3cm, yshift=-0.1cm]north:{\tightlabel{\mbox{MCPサーバー}}}}] {};
           \node [subgroup, fill=white, inner sep=2pt, fit=(T12) (T4)] {}; 
         
-          \node [group, fit=(SocketListener) (SceneData) (H_Insp) (H_Exec), label={[group_label]south:{\tightlabel{\mbox{Blender実行環境}}}}] {};
-          \node [subgroup, fill=white, inner sep=2pt, fit=(SocketListener) (H_Insp) (H_Exec), label={[group_label,xshift=1.4cm,yshift=1cm]left:{\tightlabel{\mbox{アドオン層}}}}] {};
+          \node [group, fit=(SocketListener) (SceneData) (H_Insp) (H_Exec) (BPY), label={[group_label]south:{\tightlabel{\mbox{Blender実行環境}}}}] {};
+          \node [subgroup, fill=white, inner sep=2pt, fit=(SocketListener) (H_Insp) (H_Exec), label={[group_label,xshift=0cm,yshift=1cm]left:{\tightlabel{\mbox{\rotatebox{90}{}}}}}] {};
       \end{scope}
 
       % --- Connections ---
@@ -86,9 +86,9 @@
       \draw [arrow] (SocketListener) -- (Router);
       \draw [arrow] (Router) -- (H_Exec);
       \draw [darrow] (Router) -- (H_Insp);
-      \draw [arrow] (H_Exec) -- (BPY);
-      \draw [darrow] (H_Insp) -- (BPY);
-      \draw [darrow] (BPY) -- (SceneData);
+      \draw [arrow] (H_Exec) -- ([xshift=-0.25cm]BPY.north);
+      \draw [darrow] (H_Insp) -- ([xshift=0.3cm]BPY.north);
+      \draw [darrow] ([xshift=-0.25cm]BPY.south) -- (SceneData);
       \draw [darrow] (SceneData) -- (BlenderEnv);
 
   \end{tikzpicture}%
