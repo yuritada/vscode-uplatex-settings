@@ -1,0 +1,79 @@
+\documentclass[uplatex, dvipdfmx, twocolumn]{jsarticle}
+\usepackage[utf8]{inputenc}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds}
+
+\tikzset{
+    base/.style={rectangle, draw, rounded corners, inner sep=5pt, align=center, font=\scriptsize, fill=white, line width=0.6pt},
+    llm/.style={base, fill=blue!5, draw=blue!70!black},
+    storage/.style={base, fill=orange!5, draw=orange!70!black},
+    mcp/.style={base, fill=purple!5, draw=purple!70!black},
+    blender/.style={base, fill=green!5, draw=green!70!black},
+    group/.style={draw, dashed, inner sep=5pt, rounded corners, fill=gray!5},
+    % エラーの原因だった \xkanjiskip=0pt をスタイルから削除し、フォントのみに
+    group_label/.style={font=\sffamily\bfseries\scriptsize},
+    arrow/.style={-{Stealth[inset=1.5pt, length=5pt, width=4pt]}, line width=0.5pt, draw=black!80},
+    darrow/.style={{Stealth[inset=1.5pt, length=5pt, width=4pt]}-{Stealth[inset=1.5pt, length=5pt, width=4pt]}, line width=0.5pt, draw=black!80},
+    dashed_arrow/.style={-{Stealth[inset=1.5pt, length=5pt, width=4pt]}, dashed, line width=0.5pt, draw=black!80}
+}
+
+% 和欧文間の空きを詰める命令を定義
+\newcommand{\tightlabel}[1]{{\xkanjiskip=0pt #1}}
+
+\begin{document}
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{0.95\columnwidth}{!}{%
+  \begin{tikzpicture}[scale=1.1, every node/.style={scale=1.0}]
+      \coordinate (Origin) at (0,0);
+
+      % ノードの定義
+      \node (User) [base] at ($(Origin) + (-1.5, 2.0)$) {ユーザー};
+      \node (Input) [base] at ($(Origin) + (-1.5,  1.3)$) {自然言語プロンプト};
+      \node (LLM) [llm] at ($(Origin) + (-1.5, 0.1)$) {\tightlabel{\mbox{ローカルLLM}}};
+      \node (Planner)  [llm]  at ($(Origin) + (-1.5, -0.9)$) {プランナー\\モジュール};
+      \node (StaticDB)  [storage] at ($(Origin) + (2.0,  0.2)$) {StaticDB\\(規制)};
+      \node (DynamicDB) [storage] at ($(Origin) + (2.0, -0.7)$) {DynamicDB\\(戦略)};
+      \node (Router) [mcp] at ($(Origin) + (-1.5, -2.1)$) {\tightlabel{\mbox{MCPルーター}}};
+      \node (T1) [mcp] at ($(Origin) + (-2.2, -3.2)$) {T1: 操作};
+      \node (T2) [mcp] at ($(Origin) + (-0.8, -3.2)$) {T2: 空間};
+      \node (T3) [mcp] at ($(Origin) + ( 0.6, -3.2)$) {T3: 検査};
+      \node (T4) [mcp] at ($(Origin) + ( 2.0, -3.2)$) {T4: 知識};
+      \node (API)   [blender] at ($(Origin) + (-1.5, -4.7)$) {Python API\\(bpy)};
+      \node (Scene) [blender] at ($(Origin) + ( 1.5, -4.7)$) {3Dシーン\\状態};
+      \node (BlenderEnv) [blender] at ($(Origin) + (1.5, -5.7)$) {ビューポート(GUI)};
+
+      % グループ化 (ラベル部分に \tightlabel{} を適用)
+      \begin{scope}[on background layer]
+          \node (User_Layer) [group, fit=(User) (Input), label={[group_label]north:\tightlabel{ユーザー層}}] {};
+          \node (AI_Core)    [group, fit=(LLM) (Planner), label={[group_label, xshift=-0.7cm,yshift=-0.1cm]north:\tightlabel{\mbox{AIコア層}}}] {};
+          \node (KB)         [group, fit=(StaticDB) (DynamicDB), label={[group_label]north:\tightlabel{知識層}}] {};
+          \node (Tools)      [group, fit=(T1) (T4)] {};
+          \node (MCP_Layer)  [group, fit=(Router) (Tools), label={[group_label]south:\tightlabel{\mbox{MCP統合層}}}] {};
+          \node (Exec)       [group, fit=(API) (Scene) (BlenderEnv), label={[group_label]below:\tightlabel{\mbox{Blender環境層}}}] {};
+      \end{scope}
+
+      % 接続
+      \draw [arrow] (User) -- (Input);
+      \draw [arrow] (Input) -- (LLM);
+      \draw [darrow] (LLM) -- (Planner);
+      \draw [arrow] (Planner) -- (Router);
+      \foreach \t in {T1, T2, T3, T4} { 
+          \draw [arrow] (Router.south) -- ++(0,-0.2) -| (\t.north); 
+      }
+      \draw [arrow] (StaticDB.west) -| ([xshift=0.2cm]T3.north);
+      \draw [arrow] (Scene.north) -- (T3.south);
+      \draw [darrow] ([xshift=0.2cm]DynamicDB.south) -- ([xshift=0.2cm]T4.north);
+      \draw [dashed_arrow] ([xshift=-0.2cm]T4.north) --  ([xshift=0.5cm]Planner.south);
+      \draw [arrow] (T1.south) -- ([xshift=-0.2cm]API.north);
+      \draw [arrow] (T2.south) -- ([xshift=0.2cm]API.north);
+      \draw [darrow] (API) -- (Scene);
+      \draw [arrow] (Scene) -- (BlenderEnv);
+      \draw [arrow] ([xshift=-2mm]T3.north) |- (0,0.1) -- (LLM.0);
+  \end{tikzpicture}%
+  }
+  \caption{ユーザーからBlender環境までの全体構成図}
+\end{figure}
+
+\end{document}

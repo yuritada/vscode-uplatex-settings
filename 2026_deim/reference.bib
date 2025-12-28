@@ -1,9 +1,184 @@
-@article{Codd1970,
-    title   = "A Relational Model of Data for Large Shared Data Banks",
-    author  = "Codd, E. F.",
-    journal = "Communications of the {ACM} (CACM)",
-    volume  = "13",
-    number  = "6",
-    pages   = "377--387",
-    year    = "1970",
+% --- 3D Generation & Neural Rendering (Background) ---
+@inproceedings{mildenhall2020nerf,
+  title={NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis},
+  author={Mildenhall, Ben and Srinivasan, Pratul P and Tancik, Matthew and Barron, Jonathan T and Ramamoorthi, Ravi and Ng, Ren},
+  booktitle={ECCV},
+  year={2020}
+}
+
+@article{kerbl20233dgs,
+  title={3D Gaussian Splatting for Real-Time Radiance Field Rendering},
+  author={Kerbl, Bernhard and Kopanas, Georgios and Leimk{\"u}hler, Thomas and Drettakis, George},
+  journal={ACM Transactions on Graphics (TOG)},
+  volume={42},
+  number={4},
+  year={2023}
+}
+
+@inproceedings{poole2022dreamfusion,
+  title={DreamFusion: Text-to-3D using 2D Diffusion},
+  author={Poole, Ben and Jain, Ajay and Barron, Jonathan T and Mildenhall, Ben},
+  booktitle={ICLR},
+  year={2023}
+}
+
+@article{nichol2022point,
+  title={Point-E: A System for Generating 3D Point Clouds from Complex Prompts},
+  author={Nichol, Alex and Jun, Heewoo and Dhariwal, Prafulla and Mishkin, Pamela and Chen, Mark},
+  journal={arXiv preprint arXiv:2212.08751},
+  year={2022}
+}
+
+% --- Procedural Generation & LLM-based 3D (Related Work) ---
+@article{sun20233dgpt,
+  title={3D-GPT: Procedural 3D Modeling with Large Language Models},
+  author={Sun, Ke and others},
+  journal={arXiv preprint arXiv:2310.12945},
+  year={2023}
+}
+
+@inproceedings{hu2024scenecraft,
+  title={SceneCraft: An LLM Agent for Synthesizing 3D Scene as Blender Code},
+  author={Hu, Ziniu and others},
+  booktitle={CVPR},
+  year={2024}
+}
+
+@inproceedings{raistrick2023infinigen,
+  title={Infinite Photorealistic Worlds using Procedural Generation},
+  author={Raistrick, Alexander and others},
+  booktitle={CVPR},
+  year={2023}
+}
+
+% --- Metrics & Evaluation (Problem Statement) ---
+@inproceedings{fan2017point,
+  title={A Point Set Generation Network for 3D Object Reconstruction from a Single Image},
+  author={Fan, Haoqiang and Su, Hao and Guibas, Leonidas J},
+  booktitle={CVPR},
+  year={2017}
+}
+
+@inproceedings{zhang2018lpips,
+  title={The Unreasonable Effectiveness of Deep Features as a Perceptual Metric},
+  author={Zhang, Richard and Isola, Phillip and Efros, Alexei A and Shechtman, Eli and Wang, Oliver},
+  booktitle={CVPR},
+  year={2018}
+}
+
+@inproceedings{radford2021clip,
+  title={Learning Transferable Visual Models From Natural Language Supervision},
+  author={Radford, Alec and others},
+  booktitle={ICML},
+  year={2021}
+}
+
+% --- Agents, MCP, & Tool Use (Methodology Core) ---
+@misc{anthropic2024mcp,
+  title={Model Context Protocol: An open standard for connecting AI assistants to systems},
+  author={Anthropic},
+  year={2024},
+  howpublished={\url{https://modelcontextprotocol.io/}},
+  note={Accessed: 2025-01-01}
+}
+
+@inproceedings{yao2023react,
+  title={ReAct: Synergizing Reasoning and Acting in Language Models},
+  author={Yao, Shunyu and Zhao, Jeffrey and Yu, Dian and Du, Nan and Shafran, Izhak and Narasimhan, Karthik and Cao, Yuan},
+  booktitle={ICLR},
+  year={2023}
+}
+
+@inproceedings{schick2024toolformer,
+  title={Toolformer: Language Models Can Teach Themselves to Use Tools},
+  author={Schick, Timo and others},
+  booktitle={NeurIPS},
+  year={2023}
+}
+
+@inproceedings{wei2022chain,
+  title={Chain-of-Thought Prompting Elicits Reasoning in Large Language Models},
+  author={Wei, Jason and others},
+  booktitle={NeurIPS},
+  year={2022}
+}
+
+@article{xi2023rise,
+  title={The Rise and Potential of Large Language Model Based Agents: A Survey},
+  author={Xi, Zhiheng and others},
+  journal={arXiv preprint arXiv:2309.07864},
+  year={2023}
+}
+
+% --- Knowledge, Memory & Self-Correction (Methodology & Discussion) ---
+@inproceedings{lewis2020rag,
+  title={Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks},
+  author={Lewis, Patrick and others},
+  booktitle={NeurIPS},
+  year={2020}
+}
+
+@inproceedings{shinn2024reflexion,
+  title={Reflexion: Language Agents with Verbal Reinforcement Learning},
+  author={Shinn, Noah and others},
+  booktitle={NeurIPS},
+  year={2023}
+}
+
+@inproceedings{wang2023voyager,
+  title={Voyager: An Open-Ended Embodied Agent with Large Language Models},
+  author={Wang, Guanzhi and others},
+  booktitle={arXiv preprint arXiv:2305.16291},
+  year={2023}
+}
+
+% --- Cognitive Science (Discussion: Integration Dip) ---
+@article{strauss1982u,
+  title={U-shaped behavioral growth},
+  author={Strauss, Sidney},
+  journal={Academic Press},
+  year={1982},
+  note={Foundational work on U-shaped learning}
+}
+
+@article{siegler2004u,
+  title={U-shaped interest in U-shaped development—and what it tells us about how we think},
+  author={Siegler, Robert S},
+  journal={Journal of Cognition and Development},
+  volume={5},
+  number={1},
+  pages={1--10},
+  year={2004}
+}
+
+% --- Software & Models (Implementation) ---
+@misc{community2018blender,
+  title={Blender - a 3D modelling and rendering package},
+  author={Blender Online Community},
+  organization={Blender Foundation},
+  year={2024},
+  url={http://www.blender.org}
+}
+
+@misc{openai2025gptoss,
+  title={gpt-oss-20b: A 20B Parameter Open Source MoE Model},
+  author={OpenAI},
+  year={2025},
+  howpublished={GitHub Repository / Official Release Blog},
+  note={Released August 2025}
+}
+
+@misc{unrealmcp2024,
+  title={UnrealMCP: Model Context Protocol Integration for Unreal Engine},
+  author={Community Contributors},
+  year={2024},
+  howpublished={GitHub Repository},
+  note={Accessed: 2025-01-01}
+}
+@misc{ahuja2025blendermcp,
+  title={blender-mcp: A Model Context Protocol Integration for Blender},
+  author={Ahuja, Siddharth},
+  year={2025},
+  howpublished={\url{https://github.com/ahujasid/blender-mcp}},
+  note={GitHub Repository. Accessed: 2025-12-28}
 }

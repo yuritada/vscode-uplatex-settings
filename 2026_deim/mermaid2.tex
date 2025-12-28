@@ -1,0 +1,99 @@
+\documentclass[uplatex, dvipdfmx, twocolumn]{jsarticle}
+\usepackage[utf8]{inputenc}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds}
+
+\tikzset{
+    base/.style={rectangle, draw, rounded corners, inner sep=4pt, align=center, font=\scriptsize, fill=white, line width=0.6pt},
+    client/.style={base, fill=blue!5, draw=blue!70!black},
+    mcp/.style={base, fill=purple!5, draw=purple!70!black},
+    tools/.style={base, fill=purple!2, draw=purple!50!black},
+    storage/.style={base, fill=orange!5, draw=orange!70!black},
+    blender_proc/.style={base, fill=green!5, draw=green!70!black},
+    addon/.style={base, fill=green!2, draw=green!50!black},
+    group/.style={draw, dashed, inner sep=6pt, rounded corners, fill=gray!5},
+    subgroup/.style={draw, solid, inner sep=4pt, rounded corners, fill=white, line width=0.6pt},
+    group_label/.style={font=\sffamily\bfseries\scriptsize},
+    arrow/.style={-{Stealth[inset=1.5pt, length=5pt, width=4pt]}, line width=0.5pt, draw=black!80},
+    darrow/.style={{Stealth[inset=1.5pt, length=5pt, width=4pt]}-{Stealth[inset=1.5pt, length=5pt, width=4pt]}, line width=0.5pt, draw=black!80}
+}
+
+\newcommand{\tightlabel}[1]{{\xkanjiskip=0pt #1}}
+
+\begin{document}
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\columnwidth}{!}{%
+  \begin{tikzpicture}
+      % --- 0. 基準点 ---
+      \coordinate (Origin) at (0,0);
+
+      % --- 1. Client Process (中央軸 x=0) ---
+      \node (Orchestrator) [client] at ($(Origin) + (-1.5, 0)$) {{\tightlabel{\mbox{オーケストレーター}}}};
+      \node (Ollama) [client] at ($(Origin) + (-1.5, -0.9)$) {{\tightlabel{\mbox{推論APIクライアント}}}};
+
+      % --- 2. MCP Server Process (中央軸 x=0) ---
+      \node (FastMCP) [mcp] at ($(Origin) + (-1.5, -2.2)$) {{\tightlabel{\mbox{FastMCPサーバー}}}};
+      
+      \node (T12) [tools] at ($(Origin) + (-2.2, -3.2)$) {{\tightlabel{\mbox{T1/T2}}}};      
+      \node (T3)  [tools] at ($(Origin) + (0, -3.2)$) {{\tightlabel{\mbox{T3: 検査}}}};
+      \node (T4)  [tools] at ($(Origin) + (2.2, -3.2)$) {{\tightlabel{\mbox{T4: 知識}}}};
+      
+      \node (SocketBridge) [mcp] at ($(Origin) + (0, -4.2)$) {{\tightlabel{\mbox{通信ブリッジ}}}};
+
+      % --- 3. Data Storage (x=2.2付近に寄せる) ---
+      \node (StaticDB) [storage] at ($(Origin) + (2, 0)$) {{\tightlabel{\mbox{StaticDB}}}};
+      \node (DynamicDB) [storage] at ($(Origin) + (2, -0.9)$) {{\tightlabel{\mbox{DynamicDB}}}};
+
+      % --- 4. Blender Process (中央軸 x=0) ---
+      \node (SocketListener) [addon] at ($(Origin) + (0, -5.3)$) {{\tightlabel{\mbox{ソケットリスナー}}}};
+      \node (Router) [addon] at ($(Origin) + (0, -6.1)$) {{\tightlabel{\mbox{コマンドルーター}}}};
+      
+      \node (H_Exec) [addon] at ($(Origin) + (-1.5, -7.1)$) {{\tightlabel{\mbox{操作実行ハンドラ}}}};
+      \node (H_Insp) [addon] at ($(Origin) + (1.5, -7.1)$) {{\tightlabel{\mbox{シーン解析ハンドラ}}}};
+      
+      \node (BPY) [blender_proc] at ($(Origin) + (-1.5, -8.1)$) {{\tightlabel{\mbox{Blender API (bpy)}}}};
+      \node (SceneData) [blender_proc] at ($(Origin) + (-1.5, -9.0)$) {{\tightlabel{\mbox{シーン状態データ}}}};
+      \node (BlenderEnv) [blender_proc] at ($(Origin) + (1.5, -9.0)$) {{\tightlabel{\mbox{ビューポート(GUI)}}}};
+
+
+      % --- Background Layers (subgraphs) ---
+      \begin{scope}[on background layer]
+          \node [group, fit=(Orchestrator) (Ollama), label={[group_label]north:{\tightlabel{\mbox{クライアント層}}}}] {};
+          
+          \node [group, fit=(StaticDB) (DynamicDB), label={[group_label]north:{\tightlabel{\mbox{知識DB}}}}] {};
+          
+          \node (MCP_Box) [group, fit=(FastMCP) (T12) (T4) (SocketBridge), label={[group_label,xshift=-0.3cm, yshift=-0.1cm]north:{\tightlabel{\mbox{MCPサーバー}}}}] {};
+          \node [subgroup, fill=white, inner sep=2pt, fit=(T12) (T4)] {}; 
+        
+          \node [group, fit=(SocketListener) (SceneData) (H_Insp) (H_Exec), label={[group_label]south:{\tightlabel{\mbox{Blender実行環境}}}}] {};
+          \node [subgroup, fill=white, inner sep=2pt, fit=(SocketListener) (H_Insp) (H_Exec), label={[group_label,xshift=1.4cm,yshift=1cm]left:{\tightlabel{\mbox{アドオン層}}}}] {};
+      \end{scope}
+
+      % --- Connections ---
+      \draw [darrow] (Orchestrator) -- (Ollama);
+      \draw [arrow] (Ollama) -- (FastMCP);
+      \draw [arrow] (FastMCP) -- (T12);
+      \draw [arrow] (FastMCP) -- (T3);
+      \draw [arrow] (FastMCP) -- (T4.160);
+      \draw [arrow] (T3) -- (StaticDB.west);
+      \draw [darrow] (T4) -- (DynamicDB.south);
+      \draw [arrow] (T12) -- (SocketBridge);
+      \draw [arrow] (T3) -- (SocketBridge);
+      \draw [arrow] (T4) -- (SocketBridge);
+      \draw [darrow] (SocketBridge) -- (SocketListener);
+      \draw [arrow] (SocketListener) -- (Router);
+      \draw [arrow] (Router) -- (H_Exec);
+      \draw [darrow] (Router) -- (H_Insp);
+      \draw [arrow] (H_Exec) -- (BPY);
+      \draw [darrow] (H_Insp) -- (BPY);
+      \draw [darrow] (BPY) -- (SceneData);
+      \draw [darrow] (SceneData) -- (BlenderEnv);
+
+  \end{tikzpicture}%
+  }
+  \caption{基準点座標指定によるシステム構成図}
+\end{figure}
+
+\end{document}
