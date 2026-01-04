@@ -1095,10 +1095,10 @@
       \ifx\Mail@ddress\empty\else\Mail@ddress,\ \fi
        \ifnum\@totalnumber=\@ne
         \if@affinone\else
-         $\deim@fnsymbol{\the\@tempcntb}$%
+        %  $\deim@fnsymbol{\the\@tempcntb}$%
         \fi
        \else
-        $\deim@fnsymbol{\the\@tempcntb}$%
+        % $\deim@fnsymbol{\the\@tempcntb}$%
        \fi
        \ifnum\@tempcnta=\@ne
         \expandafter\csname \csname adrs\number\@tempcntb\endcsname \endcsname
