@@ -1,0 +1,408 @@
+# タイトル
+
+Model Context Protocolを用いた二層知識継承による建築制約を持つ屋内シーン生成の自律的品質保証
+
+# 著者情報
+
+多田 有里, 中村 亮太
+武蔵野大学データサイエンス学部 〒135--8181 東京都江東区有明3丁目3--3
+E-mail: [s2422110@stu.musashino-u.ac.jp], [ryonaka@musashino-u.ac.jp]
+
+### あらまし
+
+近年の生成AIの進展により、Text-to-3D技術は飛躍的な視覚的品質を達成したが、既存手法はレンダリング画像の「自然さ」を優先するため、物理的・工学的整合性を欠く問題（本研究ではこれを「幾何学的ハルシネーション」と定義する）が未解決の課題となっている。本研究では、この課題に対し、Model Context Protocol (MCP) を基盤とした自律的品質保証フレームワークを提案する。本手法は、LLMと3D環境（Blender）を接続し、視覚情報ではなく数値データ（座標、法線、寸法）に基づいてモデルを直接検査・修正する「生成・検査・修正」サイクルを自律的に実行する。
+
+システムは、不変の「規制知識」と適応的な「経験知識」からなる二層知識構造を有し、過去の修正プロセスから効率的な方策を獲得する知識継承メカニズムを備えている。建築制約を持つ生成タスクにおける評価実験の結果、提案手法は視覚ベースでは困難な厳密な制約充足を達成した。さらに、性能推移の分析により、知識の蓄積が自律性スコアを最大値の「5」まで向上させ、初期試行と比較してトークン消費量を約58%削減することを定量的に実証した。本研究は、3D生成の評価軸を主観的な「見た目」から客観的な「構造的整合性」へと拡張し、エンジニアリングツールとしての生成AIの可能性を拓くものである。
+
+**キーワード**: Text-to-3D，Model Context Protocol，Generative AI，Quality Assurance，Knowledge Inheritance
+
+# 第1章 はじめに
+
+## 1.1 研究の背景：視覚的「自然さ」から構造的「整合性」へ
+
+近年、生成AI技術の進展は目覚ましく、テキストから画像、映像、そして3Dモデルを生成することが日常的な技術となりつつある。特に大規模言語モデル（LLM）を用いた「3D-GPT」[cite]のようなプロシージャル生成フレームワークは、専門的なスキルを持たないユーザーでも複雑な3Dシーンを構築できる可能性を切り開いた。しかし、既存のText-to-3D技術が生み出す成果物は、レンダリング画像としての視覚的な「自然さ」において優れている一方で、構造的な「整合性」や物理的な「妥当性」において致命的な欠陥を抱えることが多い。
+
+例えば、生成された建築モデルにおいて、ドアが床から数センチ浮遊していたり、窓が壁の厚みに埋没していたり、あるいは階段の段差が不均一であったとしても、特定のアングルからの静止画では成立して見えることがある。本研究では、レンダリング画像  においては視覚的な違和感が生じないものの、3D空間上の幾何学的制約 （例：接地性 、非干渉性 ）を満たさない状態（）を「幾何学的ハルシネーション」と定義する。これらは、2D画像への射影過程で情報が欠落するために生じる、Vision Language Model (VLM) 等の視覚ベース評価では原理的に検出困難なエラーである。
+
+幾何学的ハルシネーションが生じる根源は、現在の生成パラダイムがCLIPスコア[cite]やLPIPS[cite]といった「視覚的評価」に過度に依存している点にある。VLMは画像の類似性を判断できても、「垂直性」「接地性」「包含関係」といった3D空間特有の厳密な幾何学的制約を、2D画像から正確に逆推論することは本質的に困難である。
+
+## 1.2 本研究の目的
+
+本研究の目的は、建築制約を持つ屋内3Dシーン生成において、視覚情報に依存せず、数値データに基づく厳密な検査のみを用いた自律的品質保証フレームワークを構築することである。特に、静的な法規制（StaticDB）と動的な経験知識（DynamicDB）を分離・統合するアーキテクチャにより、幾何学的整合性の保証と、試行回数の削減による推論コストの最適化を同時に達成することを、定量的に実証する。
+
+## 1.3 解決へのアプローチ：MCPによる数値的介入と知識の永続化
+
+人間が瞬時に感じる「違和感」を、AIはいかにして検知し、修正すべきか。本研究では、この課題に対し「視覚」ではなく「数値」に基づく決定論的なアプローチを提案する。具体的には、Model Context Protocol (MCP)[cite] を介してLLMを3Dモデリング環境（Blender）に直接接続し、エージェントが3D空間を座標や寸法といった「数値データ」として認識・操作するアーキテクチャを構築する。
+
+本システムの特徴は、書き換え不可能な「規制知識（StaticDB）」と、ユーザーからのフィードバックを通じて成長する「経験知識（DynamicDB）」を分離した二層知識モデルにある。エージェントは、物理法則や建築基準法といった絶対的なルールを遵守しつつ、対話を通じて得た修正指示を新たなルールとして知識ベースに蓄積する。これにより、セッションごとに記憶がリセットされる従来のLLMエージェントの限界を克服し、使い込むほどに文脈理解が深化し、推論コストが最適化される「経験を蓄積するパートナー」としてのAIを実現する。
+
+## 1.4 本研究の貢献
+
+本研究の主な貢献は以下の2点に集約される。
+
+1. **数値検査に基づくMCPループの構築:**
+視覚的評価（VLM）を完全に排除し、MCPを介して3D座標・法線データを直接検証するループを実装した点。これにより、画像ベースの手法では検出不可能なオクルージョン領域や微細な位置ズレの修正を可能にした。
+2. **二層知識構造による探索の効率化:**
+エージェントの知識を不変の「規制」と可変の「戦略」に分離し、修正プロセスで得た成功パターンを永続化するメカニズムを実装した点。これにより、初期のランダムな探索から、知識検索による即時解決へと行動を変容させることが可能となった。
+
+# 第2章 関連研究
+
+本章では、Text-to-3D技術における評価指標の変遷と課題、および大規模言語モデル（LLM）を用いた3D操作に関する最新の研究動向を概観する。特に、既存の視覚ベースのフィードバックループが抱える限界を指摘し、本研究が採用するMCPを用いた構造的検証アプローチの優位性と学術的位置付けを明確にする。
+
+## 2.1 3D生成モデルにおける評価指標の変遷と課題
+
+3Dコンピュータビジョンとグラフィックスの分野は、深層学習の導入により劇的な変革を遂げている。初期の3D生成モデルは、点群やボクセル、メッシュといった明示的な3D表現を直接生成することを目的としており、その評価にはChamfer Distance (CD) やEarth Mover's Distance (EMD) といった幾何学的距離指標が標準的に用いられてきた[cite]。これらの指標は、生成された形状と正解データとの間の物理的な距離を測定するため、幾何学的な忠実度を保証する上では一定の有効性を持つ。しかし、CDは点密度の不均一性に鈍感である「不感領域」の問題を抱え、EMDは計算コストが非常に高いという実用上の課題があった。
+
+その後、Neural Radiance Fields (NeRF)[cite] や3D Gaussian Splatting (3DGS)[cite] の登場により、パラダイムは「画像からの逆投影」による生成へとシフトした。これに伴い、評価指標もPSNR、SSIM、そしてLPIPS[cite]やCLIP Score[cite]といった画像空間での知覚的類似性指標が主流となった。特にLPIPSは人間の知覚と高い相関を持つとされるが、これらは本質的に「2Dの見た目」を評価するものであり、3D構造としての整合性を保証しない。
+
+例えば、ある視点からは整合して見えるが、裏側が欠損している、あるいは物体同士が物理的に不可能な交差をしているといった問題（2Dチーティング）は、画像ベースの指標では検出困難である[cite]。建築やプロダクトデザインのようなエンジニアリンググレードの整合性が求められる領域において、これらの「自然さ」のみを追求する指標は不十分であり、構造的な「妥当性」を担保する新たな枠組みが必要とされている。
+
+## 2.2 LLMによる3D空間操作と視覚フィードバックの限界
+
+LLMの高い推論能力を活かし、エージェントとして3D空間を操作させる試みも始まっている。代表的な研究であるSceneCraft[cite]は、ユーザーの自然言語指示をBlenderのPythonスクリプトに変換し、その実行結果をレンダリング画像として取得、マルチモーダルLLM (MLLM) で解析することで修正ループを回す手法を提案した。このアプローチは、プログラマティックな操作により幾何学的構造をある程度制御できる点で画期的である。
+
+しかし、SceneCraft等の既存手法は「視覚フィードバック」に依存しているため、VLMの空間認識能力の限界に縛られるという課題がある。視覚情報は3次元情報の2次元への圧縮（射影）であり、そこから完全な3D構造を復元・評価することは逆問題として本質的な不安定さを孕んでいる。例えば、「物体が床から数ミリ浮いている」といった微細な誤差や、「壁の内部に配管が正しく通っているか」といったオクルージョンの検証は、2D画像からは原理的に不可能に近い。
+
+したがって、正確な3Dモデリングを実現するためには、視覚情報に頼らない、シーンデータ（頂点座標、法線ベクトル、バウンディングボックス等）への直接的なアクセスと、数値に基づく論理的な検証が必要となる。
+
+## 2.3 MCPとエージェントの自律性
+
+Anthropicによって導入されたMCP[cite] は、AIモデルと外部ツール間の通信を標準化するオープンプロトコルであり、エージェントシステムの実装に革新をもたらしている。従来の関数呼び出し（Function Calling）が単発の関数実行を目的としていたのに対し[cite]、MCPはクライアント・サーバー間のステートフルな接続を維持し、リソースの購読やプロンプトのテンプレート化、そして何より「Sampling」プリミティブによる双方向のインタラクションをサポートしている点が特徴である。
+
+「Sampling」機能は、サーバー側（ツール側）からクライアント（LLM）に対して、コンテキストを与えた上で次の行動を能動的に問い合わせることを可能にする。これにより、エージェントは自身の行動結果（ツールの出力やエラーメッセージ）を受け取り、それを評価して次の行動を決定する自律的なループ（ReActサイクル[cite]や自己修正ループ[cite]）を、標準化されたプロトコル上で堅牢に実装可能となる。
+
+既存のUnrealMCP[cite]などの実装は、自然言語によるコマンド実行を可能にしたが、体系的な評価フレームワークや、失敗から学ぶ自己改善ループまでは実装されていないのが現状である。
+
+本研究では、この「研究の空白領域」に着目する。具体的には、MCPの双方向性を活かし、視覚ではなく数値データに基づく厳密な検査をループに組み込むことで、SceneCraftの課題であった精度の問題を解決する。さらに、知識グラフ上の推論に着想を得た知識継承メカニズム（DynamicDB）をMCPサーバー内に実装することで、セッションを超えて経験を蓄積し、適応的に成長するエージェントアーキテクチャを提案するものである。これは、単なる自動化ツールを超え、設計者の意図と法的な制約を調停するパートナーとしてのAIの実現に向けた重要なステップとなる。
+
+# 第3章 提案手法
+
+本章では、3Dモデリングにおける構造的な整合性の担保と、経験に基づく適応的な戦略獲得を実現するためのシステムアーキテクチャ「Dual-Knowledge MCP Architecture」について詳述する。本提案手法の中核は、推論能力と実行環境を標準プロトコルで疎結合に接続し、静的な規制知識と動的な経験知識という性質の異なる二つの知識源を統合的に運用する点にある。
+
+## 3.1 システムアーキテクチャの全体構想
+
+本システムの設計思想は、高度な推論を行うAIコア（LLM）と、物理的なシミュレーションを行う3D環境（Blender[cite]）を明確に分離し、その間を標準化されたインターフェース（MCP）で調停することにある。この疎結合な設計により、特定のLLMや3Dソフトウェアに依存しない拡張性と、各コンポーネントの独立した進化を担保している。
+
+システムの全体的な概念図を **図1** に示す。アーキテクチャは主に4つの論理階層によって構成される。
+
+```latex
+\begin{tikzpicture}[scale=1.1, every node/.style={scale=1.0}]
+      \coordinate (Origin) at (0,0);
+      % ノードの定義
+      \node (User) [base] at ($(Origin) + (-1.5, 2.0)$) {ユーザー};
+      \node (Input) [base] at ($(Origin) + (-1.5,  1.3)$) {自然言語プロンプト};
+      \node (LLM) [llm] at ($(Origin) + (-1.5, 0.1)$) {\tightlabel{\mbox{ローカルLLM}}};
+      \node (Planner)  [llm]  at ($(Origin) + (-1.5, -0.9)$) {プランナー\\モジュール};
+      \node (StaticDB)  [storage] at ($(Origin) + (2.0,  0.2)$) {StaticDB\\(規制)};
+      \node (DynamicDB) [storage] at ($(Origin) + (2.0, -0.7)$) {DynamicDB\\(戦略)};
+      \node (Router) [mcp] at ($(Origin) + (-1.5, -2.1)$) {\tightlabel{\mbox{MCPルーター}}};
+      \node (T1) [mcp] at ($(Origin) + (-2.2, -3.2)$) {T1: 操作};
+      \node (T2) [mcp] at ($(Origin) + (-0.8, -3.2)$) {T2: 空間};
+      \node (T3) [mcp] at ($(Origin) + ( 0.6, -3.2)$) {T3: 検査};
+      \node (T4) [mcp] at ($(Origin) + ( 2.0, -3.2)$) {T4: 知識};
+      \node (API)   [blender] at ($(Origin) + (-1.5, -4.7)$) {Python API\\(bpy)};
+      \node (Scene) [blender] at ($(Origin) + ( 1.5, -4.7)$) {3Dシーン\\状態};
+      \node (BlenderEnv) [blender] at ($(Origin) + (1.5, -5.7)$) {ビューポート(GUI)};
+      % グループ化
+      \begin{scope}[on background layer]
+          \node (User_Layer) [group, fit=(User) (Input), label={[group_label]north:\tightlabel{ユーザー層}}] {};
+          \node (AI_Core)    [group, fit=(LLM) (Planner), label={[group_label, xshift=-0.7cm,yshift=-0.1cm]north:\tightlabel{\mbox{AIコア層}}}] {};
+          \node (KB)         [group, fit=(StaticDB) (DynamicDB), label={[group_label]north:\tightlabel{知識層}}] {};
+          \node (Tools)      [group, fit=(T1) (T4)] {};
+          \node (MCP_Layer)  [group, fit=(Router) (Tools), label={[group_label]south:\tightlabel{\mbox{MCP統合層}}}] {};
+          \node (Exec)       [group, fit=(API) (Scene) (BlenderEnv), label={[group_label]below:\tightlabel{\mbox{Blender環境層}}}] {};
+      \end{scope}
+
+      % 接続
+      \draw [arrow] (User) -- (Input);
+      \draw [arrow] (Input) -- (LLM);
+      \draw [darrow] (LLM) -- (Planner);
+      \draw [arrow] (Planner) -- (Router);
+      \foreach \t in {T1, T2, T3, T4} {
+          \draw [arrow] (Router.south) -- ++(0,-0.2) -|
+          (\t.north);
+      }
+      \draw [arrow] (StaticDB.west) -| ([xshift=0.2cm]T3.north);
+      \draw [arrow] (Scene.north) -- (T3.south);
+      \draw [darrow] ([xshift=0.2cm]DynamicDB.south) -- ([xshift=0.2cm]T4.north);
+      \draw [dashed_arrow] ([xshift=-0.2cm]T4.north) --  ([xshift=0.5cm]Planner.south);
+      \draw [arrow] (T1.south) -- ([xshift=-0.2cm]API.north);
+      \draw [arrow] (T2.south) -- ([xshift=0.2cm]API.north);
+      \draw [darrow] (API) -- (Scene);
+      \draw [arrow] (Scene) -- (BlenderEnv);
+      \draw [arrow] ([xshift=-2mm]T3.north) |- (0,0.1) -- (LLM.0);
+  \end{tikzpicture}%
+
+```
+
+図1: 提案システムの概念的アーキテクチャ図
+
+### 3.1.1 AIコア層：推論と計画
+
+システムの頭脳にあたる本層では、ローカル環境等のセキュアなインフラ上で運用可能な「gpt-oss:20b」[cite]を採用する。これは200億パラメータを持つオープンウェイトのMoE（Mixture-of-Experts）モデルであり、軽量ながら高い推論能力と指示追従性を有している。LLMは単なるテキスト生成器としてではなく、ユーザーの意図を解釈し、それを達成するためのタスクをサブゴールに分解する「プランナー」として機能する。「段階的な推論を促すプロンプト設計」[cite]を通じて、現状認識、知識参照、行動計画の策定という高次の推論プロセスを実行する。
+
+### 3.1.2 MCP統合層：標準化されたツール群
+
+AIコアからの抽象的な指示を、具体的な計算処理や3D操作に変換する中間層である。MCPルーターはリクエストを受け取り、適切なツールモジュールに振り分ける。本層には、3Dオブジェクトの生成・操作（T1, T2）、シーンの幾何学的検証（T3）、そして経験知識の蓄積・検索（T4）といった機能が、標準化されたMCPツールとして実装されている。これにより、LLMは下位層の複雑なAPIを意識することなく、関数呼び出しの形式で環境に介入できる。
+
+## 3.2 二層知識構造による適応的推論
+
+本手法の最大の独自性は、エージェントが参照する知識ベースを、性質の異なる二つのストレージに分離・統合した点にある（**図1**：知識層）。
+
+### 3.2.1 規制知識 (StaticDB)
+
+建築基準法、物理法則、あるいはプロジェクト固有の仕様書など、絶対に変更してはならない「ハード制約」を格納する静的なデータベースである。例えば「階段の蹴上げは23cm以下」「ドアは床に接していなければならない」といったルールがJSON形式で定義される。これらは検査ツール（T3）によって厳格に適用され、違反があれば即座にエラーとして検出される。この層はシステムの「法令遵守」を担保する役割を担う。
+
+### 3.2.2 経験知識 (DynamicDB)
+
+エージェントがタスク実行プロセスを通じて獲得した、「特定の文脈における有効な戦略」や「過去の成功/失敗パターン」を蓄積する動的なデータベースである[cite]。これはシステムの稼働に伴って成長する知識であり、「ソフト制約」として機能する。プランナーは、未知の状況に直面した際、このDBから類似局面における成功事例を検索（RAG: Retrieval-Augmented Generation[cite]）し、行動計画の指針とする。この層はシステムの「適応性」と戦略獲得能力を担保する。
+
+この二重構造により、エージェントは「法的には正しいが、文脈的に不適切な解」を回避しつつ、効率的に最適解を探索することが可能となる。
+
+## 3.3 自律的な品質保証ループ
+
+本システムは、Human-in-the-Loopのパラダイムを採用しつつも、人間の介入頻度を最小化するための自律的な品質保証メカニズムを内包している。**図1**の下部に示されるフィードバックループがこれに該当する。
+
+プロセスは「生成・検査・修正」のサイクルで構成される。
+
+1. **生成:** プランナーの指示に基づき、ツール群がBlender APIを介して3Dシーンを操作する。
+2. **検査:** 操作直後、検査器（T3）がStaticDBに基づきシーン全体をスキャンする。ここではVLMによる曖昧な視覚判定ではなく、バウンディングボックスや頂点座標に基づいた厳密な数値検査が行われる。
+3. **修正:** 違反が検出された場合、検査器は「ドアが床から0.5m浮いている」といった具体的な数値情報を含むエラーメッセージをAIコアにフィードバックする。LLMはこの明確な根拠に基づき、「Z軸方向に-0.5m移動させる」といった正確な修正アクションを立案・実行する。
+
+このループは、シーンが全ての規制知識を満たす（バリデーション合格）まで自律的に繰り返される。この過程で得られた「特定のエラーに対する有効な修正策」が、新たな知見としてDynamicDBに蓄積され、次回の推論に活かされることで、システムの自律性は向上していく。
+
+## 3.4 実装詳細とコンポーネント間通信
+
+前述の概念モデルを具現化するための詳細な実装構成を **図2** に示す。本システムは、Pythonベースのクライアント、FastMCPを用いたサーバー、およびBlender内のPython環境で動作するアドオンの相互連携によって実現されている。本システムのBlenderとMCPサーバー間の基本的な通信層の実装には、オープンソースソフトウェアである `blender-mcp`[cite]を採用し、これをベースに本研究独自の機能であるRAGモジュール、ルール検証器、およびローカルLLM接続機能を拡張実装した。
+
+```latex
+\begin{tikzpicture}
+      % --- 0. 基準点 ---
+      \coordinate (Origin) at (0,0);
+      % --- 1. Client Process (中央軸 x=0) ---
+      \node (Orchestrator) [client] at ($(Origin) + (-1.5, 0)$) {{\tightlabel{\mbox{オーケストレーター}}}};
+      \node (Ollama) [client] at ($(Origin) + (-1.5, -0.9)$) {{\tightlabel{\mbox{推論APIクライアント}}}};
+
+      % --- 2. MCP Server Process (中央軸 x=0) ---
+      \node (FastMCP) [mcp] at ($(Origin) + (-1.5, -2.2)$) {{\tightlabel{\mbox{FastMCPサーバー}}}};
+      \node (T12) [tools] at ($(Origin) + (-2.2, -3.2)$) {{\tightlabel{\mbox{T1/T2}}}};
+      \node (T3)  [tools] at ($(Origin) + (0, -3.2)$) {{\tightlabel{\mbox{T3: 検査}}}};
+      \node (T4)  [tools] at ($(Origin) + (2.2, -3.2)$) {{\tightlabel{\mbox{T4: 知識}}}};
+
+      \node (SocketBridge) [mcp] at ($(Origin) + (-1.5, -4.2)$) {{\tightlabel{\mbox{通信ブリッジ}}}};
+      % --- 3. Data Storage (x=2.2付近に寄せる) ---
+      \node (StaticDB) [storage] at ($(Origin) + (2, 0)$) {{\tightlabel{\mbox{StaticDB}}}};
+      \node (DynamicDB) [storage] at ($(Origin) + (2, -0.9)$) {{\tightlabel{\mbox{DynamicDB}}}};
+
+      % --- 4. Blender Process (中央軸 x=0) ---
+      \node (SocketListener) [addon] at ($(Origin) + (-1.5, -5.3)$) {{\tightlabel{\mbox{ソケットリスナー}}}};
+      \node (Router) [addon] at ($(Origin) + (1.5, -5.3)$) {{\tightlabel{\mbox{コマンドルーター}}}};
+
+      \node (H_Exec) [addon] at ($(Origin) + (-1.5, -6.2)$) {{\tightlabel{\mbox{実行ハンドラ}}}};
+      \node (H_Insp) [addon] at ($(Origin) + (1.5, -6.2)$) {{\tightlabel{\mbox{検査ハンドラ}}}};
+
+      \node (BPY) [blender_proc] at ($(Origin) + (-1.25, -7.1)$) {{\tightlabel{\mbox{Blender API (bpy)}}}};
+      \node (SceneData) [blender_proc] at ($(Origin) + (-1.5, -8.0)$) {{\tightlabel{\mbox{シーン状態データ}}}};
+      \node (BlenderEnv) [blender_proc] at ($(Origin) + (1.5, -8.0)$) {{\tightlabel{\mbox{ビューポート(GUI)}}}};
+      % --- Background Layers (subgraphs) ---
+      \begin{scope}[on background layer]
+          \node [group, fit=(Orchestrator) (Ollama), label={[group_label]north:{\tightlabel{\mbox{クライアント層}}}}] {};
+          \node [group, fit=(StaticDB) (DynamicDB), label={[group_label]north:{\tightlabel{\mbox{知識層}}}}] {};
+
+          \node (MCP_Box) [group, fit=(FastMCP) (T12) (T4) (SocketBridge), label={[group_label,xshift=-0.3cm, yshift=-0.1cm]north:{\tightlabel{\mbox{MCPサーバー}}}}] {};
+          \node [subgroup, fill=white, inner sep=2pt, fit=(T12) (T4)] {};
+
+          \node [group, fit=(SocketListener) (SceneData) (H_Insp) (H_Exec) (BPY), label={[group_label]south:{\tightlabel{\mbox{Blender実行環境}}}}] {};
+          \node [subgroup, fill=white, inner sep=2pt, fit=(SocketListener) (H_Insp) (H_Exec), label={[group_label,xshift=0cm,yshift=1cm]left:{\tightlabel{\mbox{\rotatebox{90}{}}}}}] {};
+      \end{scope}
+
+      % --- Connections ---
+      \draw [darrow] (Orchestrator) -- (Ollama);
+      \draw [arrow] (Ollama) -- (FastMCP);
+      \draw [arrow] (FastMCP) -- (T12);
+      \draw [arrow] (FastMCP) -- (T3);
+      \draw [arrow] (FastMCP) -- (T4.160);
+      \draw [arrow] (T3) -- (StaticDB.west);
+      \draw [darrow] (T4) -- (DynamicDB.south);
+      \draw [arrow] (T12) -- (SocketBridge);
+      \draw [arrow] (T3) -- (SocketBridge);
+      \draw [arrow] (T4) -- (SocketBridge);
+      \draw [darrow] (SocketBridge) -- (SocketListener);
+      \draw [arrow] (SocketListener) -- (Router);
+      \draw [arrow] (Router) -- (H_Exec);
+      \draw [darrow] (Router) -- (H_Insp);
+      \draw [arrow] (H_Exec) -- ([xshift=-0.25cm]BPY.north);
+      \draw [darrow] (H_Insp) -- ([xshift=0.3cm]BPY.north);
+      \draw [darrow] ([xshift=-0.25cm]BPY.south) -- (SceneData);
+      \draw [darrow] (SceneData) -- (BlenderEnv);
+
+  \end{tikzpicture}%
+
+```
+
+図2: システム実装詳細図と通信フロー
+
+### 3.4.1 クライアントとAIコアの実装
+
+クライアントアプリケーションは、ユーザーとの対話インターフェースを提供し、全体の処理フローを制御するオーケストレーターとして機能する。ここでは、ユーザー入力に基づき、現在のシーン状況や過去の対話履歴を含めた動的なシステムプロンプトが構築される。推論エンジンには、ローカル環境で動作するOllamaを介して `gpt-oss:20b` モデルが接続されており、プライバシーを確保しつつ低遅延な推論を実現している。
+
+### 3.4.2 MCPサーバーとハイブリッド通信
+
+MCPサーバー（main process）は、FastMCPライブラリを用いて実装されている。クライアントとの通信には標準入出力（StdIO）を用いたMCPプロトコルが採用されている。一方、Blenderとの通信には、専用のソケットブリッジモジュールを介した通信（ポート9876）が用いられる。
+
+このハイブリッドな通信方式を採用した理由は、BlenderのPython API (bpy) が持つ制約にある。`bpy` はスレッドセーフではなく、外部からの操作はメインスレッドで実行される必要がある。そのため、MCPサーバーからの要求を直接実行するのではなく、一度ソケットブリッジを経由させ、Blender側のアドオンがそれを受け取る構成とした。
+
+### 3.4.3 Blenderアドオンと実行制御
+
+Blender側には専用のアドオンが常駐する。このアドオンは、別スレッドでソケット通信をリッスンする「ソケットリスナー」と、受信したコマンドをBlenderのメインスレッドのコンテキストで安全に実行するための「コマンドルーター」で構成される。ルーターは、要求の種類に応じて適切な内部ハンドラ（コード実行や情報取得）にタスクを振り分ける。特に「検査ハンドラ」は、単にAPIを叩くだけでなく、オブジェクトのバウンディングボックス計算や、面法線の解析といった幾何学的な事前処理を行い、推論に適した構造化データとしてMCP側に返却する役割を担う。
+
+以上のアーキテクチャにより、推論の柔軟性と実行の堅牢性を両立させ、継続的な知識獲得が可能な自律型3Dモデリングエージェントが実現される。
+
+# 第4章 実験結果と考察
+
+本章では、構築したBlender-MCPエージェントを用いた建築制約違反の自律修正実験の結果を詳述する。実験は、5つの欠陥を含むシーンに対し、エージェントが対話とツール試行を通じていかに適応し、知識を蓄積していくかを定量・定性の両面から検証した。特に、セッションをまたいだ知識の永続化が、作業効率（コスト）と自律性（品質）に与える影響に焦点を当てる。
+
+## 4.1 実験設定と評価指標
+
+### 4.1.1 タスク設定と欠陥の定義
+
+検証には、一般的な居住空間を模した3Dシーンを使用した。この初期状態には、物理的・幾何学的・法規的な観点から、以下の5つの欠陥が含まれている。
+
+1. **ドアの浮遊**: ドア下端が地面（Z=0）から0.5m浮いている（物理的整合性の欠如）。
+2. **ドアの壁高超過**: ドアの上端が壁のバウンディングボックスを逸脱している（包含関係の違反）。
+3. **窓の壁高超過**: 窓の上端が壁の高さを超えている（幾何学的違反）。
+4. **窓とドアの重複**: 窓とドアの配置位置が物理的に干渉している（衝突）。
+5. **採光面積不足**: 窓の面積が床面積の1/7未満である（建築基準法に基づく法規違反）。
+
+これらの欠陥に対し、エージェントは即座に検知可能なハードな違反（(1)・(5)）と、論理的な計算や対話を要するソフトな違反（(2)・(3)・(4)）の双方に対処する必要がある。
+
+### 4.1.2 評価プロセス
+
+実験は計9回の独立したセッション（Exp 1〜Exp 9）として実施された。各セッション終了後、エージェントが獲得した知識（ルール）は `rules.json` に保存され、次回のセッションへと継承される。評価は以下の指標に基づき行われた。
+
+* **ターン数**: 問題解決に至るまでの対話往復回数。
+* **トークン消費量**: 入出力に含まれる総トークン数（コスト指標）。
+* **自律性スコア**: 各シナリオに含まれる5つの欠陥に対し、システム内の検査器（Validator）が「制約違反数 0」を出力し、かつBlenderの実行エラーが発生しなかった項目の数（0--5）とする。本指標は、人間の主観的評価ではなく、数値的整合性がシステムにより保証されたことを示す客観的指標である。なお、数値上の修正がモデルの破壊（頂点の爆発等）を引き起こしていないことは、実験後に著者が確認を行った。
+* **累積ルール数**: 知識ベースに蓄積された有効な建築ルールの総数。
+
+## 4.2 知識蓄積とコスト効率の分析
+
+実験全体を通じて、知識の蓄積に伴う顕著な適応効果が確認された。**図3**に、各セッションにおける総トークン数と所要ターン数の推移を示す。
+
+![](image/Fig3_Learning_Curve.png)
+
+図3: 知識蓄積に伴うコストの削減（累積トークンとターン数）
+
+### 4.2.1 試行錯誤から即時解決への推移
+
+実験初期（Exp 1）において、エージェントはタスク完了までに9ターンを要し、約22万トークンを消費した。この段階では、エージェントは「窓とドアの重複」や「壁高超過」といった複合的な問題に対し、ランダムなパラメータ変更と検証を繰り返す「総当たり的な探索」を行っていたことが要因である。
+
+対照的に、知識が十分に蓄積された実験後期（Exp 9）では、わずか2ターン、約9.1万トークンで全課題をクリアしている。これは初期比でターン数が約78%削減、トークン消費量が約58%削減されたことを意味する。この劇的な効率化は、エージェントが未知の探索を行わず、過去の経験則を適用するショートカットを実行したことに起因する。
+
+### 4.2.2 トークン消費の特異点と深い推論
+
+**図3**および**図4**の累積トークン推移において注目すべきは、Exp 6の結果である。ここでは6ターンに対し、全実験中で最大となる約24.8万トークンが消費されている。
+
+この現象は、蓄積されたルール数（12個）が増加したことで、プロンプトに含まれるコンテキスト量が増大したこと、およびエージェントがそれら複数のルール間の整合性を取るために、より複雑な推論を行った結果であると解釈できる。実際にログを確認すると、Exp 6では「採光計算」と「配置制約」の競合を解消するために、Pythonコード生成と自己検証を慎重に繰り返す挙動が見られた。
+
+しかし、このExp 6での「高コストな熟慮」は無駄ではなく、そこで生成された高度な解決策がルール化されたことで、続くExp 7以降のコスト低下（Exp 7: 12.8万トークン, Exp 9: 9.1万トークン）に寄与している。これは、短期的コスト（投資）が長期的効率（回収）に転換されるプロセスを示唆している。
+
+![](image/Fig4_Token_Cumulative_All.png)
+
+図4: セッション進行に伴う累積トークン消費の推移
+
+### 4.2.3 1ターンあたりの情報密度
+
+**図5**のトークン消費分布を見ると、セッションが進むにつれて1ターンあたりの消費量は増加傾向にあることがわかる。初期は単純なAPIコールの繰り返しであったが、後期では1回の発話に「ルールの参照」や「推論」が含まれるため、1ターンあたりのトークン密度（情報量）は増加している。しかし、RAGによって試行錯誤の回数そのものが劇的に削減されるため、結果として総トークン消費量は抑制され、経済合理性が成立することが実証された。
+
+![](image/Fig5_Token_Distribution_Filtered.png)
+
+図5: 1ターンあたりのトークン消費量分布
+
+## 4.3 知識蓄積と自律性の非線形な関係
+
+知識が増えれば直線的に賢くなるわけではないことが、本実験の重要な発見の一つである。**図6**に、累積ルール数と自律性スコアの相関を示す。
+
+![](image/Fig6_Knowledge_Autonomy.png)
+
+図6: 知識蓄積による自律性の向上
+
+### 4.3.1 知識統合に伴う一時的な停滞
+
+Exp 1〜3にかけて、ルール数は4から7へと順調に増加したが、自律性スコアは「2」（5つ中2つの欠陥のみ自律修正）のまま停滞した。さらにExp 4では、ルール数は7を維持しているにもかかわらず、自律性スコアが「1」（自律修正できた欠陥数が1つに減少）へと一時的に低下している。
+
+この現象は、認知科学における「U字型発達」[cite]や、システム統合時の「一時的なパフォーマンス低下」に類似している。知識ベースに断片的なルールが増えたことで、エージェントが「どのルールを優先すべきか」「どのツールを使うべきか」という判断の迷いを生じ、不適切な行動を選択する確率が高まったためと考えられる。本論文ではこの現象を「知識統合に伴う一時的な停滞」と定義する。
+
+### 4.3.2 知識の体系化と完全自律への到達
+
+しかし、この停滞は一時的なものであった。Exp 5以降、ルール数が10を超えるとスコアは回復傾向に転じ、Exp 7（ルール数14）でスコア3（3つの欠陥を自律解決）、そしてExp 9（ルール数18）でついに全5つの欠陥を全て自律的に修正するスコア5に到達した。
+
+これは、蓄積された知識がある臨界点（Critical Mass）を超えたことで、個別のルールの集合体が整合性の取れた知識ネットワークとして機能し始めたことを示している。Exp 9のエージェントは、ユーザーからの曖昧な指示に対しても、「過去の採光計算ルール」や「配置クリアランスの規定」を自律的に組み合わせ、一切のヒントなしに問題を解決する能力を獲得した。
+
+## 4.4 行動変容の定性的分析：試行錯誤から熟達へ
+
+エージェントの「賢さ」の質的な変化は、ツール使用パターンの変容に最も顕著に表れている。**図7**は、初期段階（Exp 1）と熟達段階（Exp 9）におけるツール呼び出しカテゴリの比較である。
+
+![](image/Fig7_Tool_Usage.png)
+
+図7: ツール使用戦略の変化（試行錯誤から知識活用へ）
+
+### 4.4.1 Exp 1: 試行錯誤段階
+
+Exp 1の行動分布（**図7**左）を見ると、「Blender操作」が全体の約38%（9回）、「違反チェック」が約29%（7回）を占めている。これは、操作と検証が交互に行われる「試行錯誤」のループが大半を占めていることを示している。特筆すべきは、「知見の保存」が約17%（4回）記録されている点である。エージェントは未知の欠陥に直面するたびに解決策を獲得しており、このフェーズではタスク遂行よりも「ルールの発見・保存」に多くのリソース（行動比重）が割かれていることが読み取れる。
+
+### 4.4.2 Exp 9: 熟達段階
+
+一方、Exp 9（**図7**右）では行動の構成比が劇的に変化している。操作と検証の比率は依然として高いものの、その総数は激減しており、無駄なループが排除された。最も重要な変化は、「知見の保存」が消失し、代わりに「ルール検索処理」が全体の約8%（1回）として出現している点である。わずかな比率に見えるが、この「たった1回の検索」が、その後の操作精度を決定づけている。エージェントは新たにルールを獲得する（保存）のではなく、初動で過去の記憶を引き出す（検索）行動へとシフトしており、これが熟練者の行動特性である「認知の効率化」を定量的に裏付けている。
+
+### 4.4.3 具体的事例：窓とドアの重複回避
+
+この行動変容は、特に難易度の高い「窓とドアの重複（欠陥(4)）」の処理において明確であった。
+
+* **初期段階**: エージェントはまず窓を配置し、検証ツールで `Overlap Detected` というエラーを受け取ってから、少しずつ位置をずらす対処療法的な修正を行った。
+* **後期段階**: 知識検索により「窓とドアには最低20cmのクリアランスが必要」という過去のルールを参照。配置座標を決定する段階（Pythonコード生成時）で、予めドアのバウンディングボックスを回避する計算式を組み込み、一発で干渉のない配置を実現した。
+
+## 4.5 考察
+
+### 4.5.1 知識蓄積によるコスト削減効果
+
+**図3**に示す通り、セッションが進むにつれてトークン消費量とターン数は減少傾向にある。特に、Exp 1（初期試行）はDynamicDBに有効なルールが蓄積されていない状態であり、これは知識継承を行わないベースライン（アブレーション条件）に相当する。
+Exp 1とExp 9を比較すると、プロンプト長やモデル設定は同一であるにもかかわらず、ターン数は約78%削減されている。この差異は、エージェントが未知の解を探索する計算コストと、既知の解を検索・適用する検索コストの差に起因するものであり、提案する二層知識構造が推論効率の向上に直接的に寄与していることを示している。
+
+### 4.5.2 画像ベース手法に対する優位性
+
+SceneCraft等の既存研究は、レンダリング画像を入力とするVLMの判断に依存しているため、壁の背後にある配管の干渉や、床から1mmの浮遊といった「視覚的に認識困難な欠陥」を原理的に検出できない。
+対して本手法は、Blender内の座標データを直接参照して判定を行うため、これらの欠陥を100%の精度で検出可能である。自律性スコアがExp 9において満点（5）に達した結果は、数値的アプローチが建築のような厳密性が求められるタスクにおいて、視覚的アプローチよりも本質的に適していることを示唆している。
+
+# 第5章 おわりに
+
+本研究では、3D生成における幾何学的ハルシネーションに対し、MCPを用いた数値的介入と二層知識構造による解決策を提示した。提案システムは、視覚情報に依存せず、幾何データに基づく厳密な検査により、建築基準を満たすCADグレードのモデル生成を実現した。特筆すべきは、規制知識と経験知識の統合により、絶対的なルールの順守と、過去の修正事例に基づく適応的な効率化を両立させた点にある。実験データは、知識の永続化が、初期の適応停滞を乗り越え、最終的に自律性の向上と推論コストの劇的な低減に寄与することを実証した。
+
+今後の展望として、家具や壁といった単一要素から、構造力学や設備配管を含む「家一軒」や「街区」レベルの大規模生成への拡張が挙げられる。また、現在はBlenderに限定されているMCPサーバーをUnityやUnreal Engineへと展開し、より多様なシミュレーション環境での検証を進める必要がある。本研究が示した「数値的リアリズム」の追求と知識継承モデルは、生成AIを単なるクリエイティブツールから、信頼性が不可欠なエンジニアリングや製造の現場で活用可能な自律システムへと昇華させるための重要な基盤となるであろう。
+
+# 参考文献
+
+[1] Ben Mildenhall, Pratul P Srinivasan, Matthew Tancik, Jonathan T Barron, Ravi Ramamoorthi, and Ren Ng. NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis. In *ECCV*, 2020.
+[2] Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler, and George Drettakis. 3D Gaussian Splatting for Real-Time Radiance Field Rendering. *ACM Transactions on Graphics (TOG)*, 42(4), 2023.
+[3] Ben Poole, Ajay Jain, Jonathan T Barron, and Ben Mildenhall. DreamFusion: Text-to-3D using 2D Diffusion. In *ICLR*, 2023.
+[4] Alex Nichol, Heewoo Jun, Prafulla Dhariwal, Pamela Mishkin, and Mark Chen. Point-E: A System for Generating 3D Point Clouds from Complex Prompts. *arXiv preprint arXiv:2212.08751*, 2022.
+[5] Ke Sun et al. 3D-GPT: Procedural 3D Modeling with Large Language Models. *arXiv preprint arXiv:2310.12945*, 2023.
+[6] Ziniu Hu et al. SceneCraft: An LLM Agent for Synthesizing 3D Scene as Blender Code. In *CVPR*, 2024.
+[7] Alexander Raistrick et al. Infinite Photorealistic Worlds using Procedural Generation. In *CVPR*, 2023.
+[8] Haoqiang Fan, Hao Su, and Leonidas J Guibas. A Point Set Generation Network for 3D Object Reconstruction from a Single Image. In *CVPR*, 2017.
+[9] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shechtman, and Oliver Wang. The Unreasonable Effectiveness of Deep Features as a Perceptual Metric. In *CVPR*, 2018.
+[10] Alec Radford et al. Learning Transferable Visual Models From Natural Language Supervision. In *ICML*, 2021.
+[11] Anthropic. Model Context Protocol: An open standard for connecting AI assistants to systems. 2024.
+[12] Shunyu Yao et al. ReAct: Synergizing Reasoning and Acting in Language Models. In *ICLR*, 2023.
+[13] Timo Schick et al. Toolformer: Language Models Can Teach Themselves to Use Tools. In *NeurIPS*, 2023.
+[14] Jason Wei et al. Chain-of-Thought Prompting Elicits Reasoning in Large Language Models. In *NeurIPS*, 2022.
+[15] Zhiheng Xi et al. The Rise and Potential of Large Language Model Based Agents: A Survey. *arXiv preprint arXiv:2309.07864*, 2023.
+[16] Patrick Lewis et al. Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. In *NeurIPS*, 2020.
+[17] Noah Shinn et al. Reflexion: Language Agents with Verbal Reinforcement Learning. In *NeurIPS*, 2023.
+[18] Guanzhi Wang et al. Voyager: An Open-Ended Embodied Agent with Large Language Models. *arXiv preprint arXiv:2305.16291*, 2023.
+[19] Sidney Strauss. U-shaped behavioral growth. *Academic Press*, 1982.
+[20] Robert S Siegler. U-shaped interest in U-shaped development—and what it tells us about how we think. *Journal of Cognition and Development*, 5(1):1--10, 2004.
+[21] Blender Online Community. Blender - a 3D modelling and rendering package. 2024.
+[22] OpenAI. gpt-oss-20b: A 20B Parameter Open Source MoE Model. 2025.
+[23] Community Contributors. UnrealMCP: Model Context Protocol Integration for Unreal Engine. 2024.
+[24] Siddharth Ahuja. blender-mcp: A Model Context Protocol Integration for Blender. 2025.
