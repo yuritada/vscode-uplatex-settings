@@ -189,8 +189,8 @@ Anthropicによって導入されたMCP\cite{anthropic2024mcp} は，AIモデル
       \node (Input) [base] at ($(Origin) + (-1.5,  1.3)$) {自然言語プロンプト};
       \node (LLM) [llm] at ($(Origin) + (-1.5, 0.1)$) {\tightlabel{\mbox{ローカルLLM}}};
       \node (Planner)  [llm]  at ($(Origin) + (-1.5, -0.9)$) {プランナー\\モジュール};
-      \node (StaticDB)  [storage] at ($(Origin) + (2.0,  0.2)$) {StaticDB\\(規制)};
-      \node (DynamicDB) [storage] at ($(Origin) + (2.0, -0.7)$) {DynamicDB\\(戦略)};
+      \node (StaticDB)  [storage] at ($(Origin) + (2.0,  -0.35)$) {StaticDB};
+      \node (DynamicDB) [storage] at ($(Origin) + (2.0, -1.05)$) {DynamicDB};
       \node (Router) [mcp] at ($(Origin) + (-1.5, -2.1)$) {\tightlabel{\mbox{MCPルーター}}};
       \node (T1) [mcp] at ($(Origin) + (-2.2, -3.2)$) {T1: 操作};
       \node (T2) [mcp] at ($(Origin) + (-0.8, -3.2)$) {T2: 空間};
