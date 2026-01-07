@@ -20,5 +20,6 @@
       ]
     }
   ],
-  "latex-workshop.view.pdf.viewer": "tab"
+  "latex-workshop.view.pdf.viewer": "tab",
+  "files.autoSave": "off"
 }
