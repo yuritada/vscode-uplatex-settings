@@ -2928,7 +2928,7 @@
 %%\newcommand{\contentsname}{目 次}
 %%\newcommand{\listfigurename}{図 目 次}
 %%\newcommand{\listtablename}{表 目 次}
-\newcommand{\refname}{文献}
+\newcommand{\refname}{参考文献}
 %%\newcommand{\indexname}{索 引}
 \newcommand{\figurename}{図}
 \newcommand{\tablename}{表}
