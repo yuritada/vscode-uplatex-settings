@@ -1,0 +1,99 @@
+\documentclass[dvipdfmx, border=5pt]{standalone}
+
+% フォント・数式関連
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath, amssymb}
+\usepackage{bm}
+
+% TikZ関連
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds}
+
+% 設定定義（元のコードより継承）
+\tikzset{
+    base/.style={rectangle, draw, rounded corners, inner sep=5pt, align=center, font=\scriptsize, fill=white, line width=0.6pt},
+    llm/.style={base, fill=blue!5, draw=blue!70!black},
+    storage/.style={base, fill=orange!5, draw=orange!70!black},
+    mcp/.style={base, fill=purple!5, draw=purple!70!black},
+    blender/.style={base, fill=green!5, draw=green!70!black},
+    client/.style={base, fill=blue!5, draw=blue!70!black},
+    tools/.style={base, fill=purple!2, draw=purple!50!black},
+    blender_proc/.style={base, fill=green!5, draw=green!70!black},
+    addon/.style={base, fill=green!2, draw=green!50!black},
+    group/.style={draw, dashed, inner sep=5pt, rounded corners, fill=gray!5},
+    subgroup/.style={draw, solid, inner sep=4pt, rounded corners, fill=white, line width=0.6pt},
+    group_label/.style={font=\sffamily\bfseries\scriptsize},
+    arrow/.style={-{Stealth[inset=1.5pt, length=5pt, width=4pt]}, line width=0.5pt, draw=black!80},
+    darrow/.style={{Stealth[inset=1.5pt, length=5pt, width=4pt]}-{Stealth[inset=1.5pt, length=5pt, width=4pt]}, line width=0.5pt, draw=black!80},
+    dashed_arrow/.style={-{Stealth[inset=1.5pt, length=5pt, width=4pt]}, dashed, line width=0.5pt, draw=black!80}
+}
+
+% コマンド定義
+\newcommand{\tightlabel}[1]{{\xkanjiskip=0pt #1}}
+
+\begin{document}
+
+% figure環境とresizeboxを削除し、TikZ本来のサイズで出力
+\begin{tikzpicture}[scale=1.1, every node/.style={scale=1.0}]
+      % --- 0. 基準点 ---
+      \coordinate (Origin) at (0,0);
+      % --- 1. Client Process (中央軸 x=0) ---
+      \node (Orchestrator) [client] at ($(Origin) + (-1.5, 0)$) {{\tightlabel{\mbox{オーケストレーター}}}};
+      \node (Ollama) [client] at ($(Origin) + (-1.5, -0.9)$) {{\tightlabel{\mbox{推論APIクライアント}}}};
+
+      % --- 2. MCP Server Process (中央軸 x=0) ---
+      \node (FastMCP) [mcp] at ($(Origin) + (-1.5, -2.2)$) {{\tightlabel{\mbox{FastMCPサーバ}}}};
+      \node (T12) [tools] at ($(Origin) + (-2.2, -3.2)$) {{\tightlabel{\mbox{T1/T2}}}};
+      \node (T3)  [tools] at ($(Origin) + (0, -3.2)$) {{\tightlabel{\mbox{T3: 検査}}}};
+      \node (T4)  [tools] at ($(Origin) + (2.2, -3.2)$) {{\tightlabel{\mbox{T4: 知識}}}};
+
+      \node (SocketBridge) [mcp] at ($(Origin) + (-1.5, -4.2)$) {{\tightlabel{\mbox{通信ブリッジ}}}};
+      % --- 3. Data Storage (x=2.2付近に寄せる) ---
+      \node (StaticDB) [storage] at ($(Origin) + (2, 0)$) {{\tightlabel{\mbox{StaticDB}}}};
+      \node (DynamicDB) [storage] at ($(Origin) + (2, -0.9)$) {{\tightlabel{\mbox{DynamicDB}}}};
+
+      % --- 4. Blender Process (中央軸 x=0) ---
+      \node (SocketListener) [addon] at ($(Origin) + (-1.5, -5.3)$) {{\tightlabel{\mbox{ソケットリスナー}}}};
+      \node (Router) [addon] at ($(Origin) + (1.5, -5.3)$) {{\tightlabel{\mbox{コマンドルーター}}}};
+
+      \node (H_Exec) [addon] at ($(Origin) + (-1.5, -6.2)$) {{\tightlabel{\mbox{実行ハンドラ}}}};
+      \node (H_Insp) [addon] at ($(Origin) + (1.5, -6.2)$) {{\tightlabel{\mbox{検査ハンドラ}}}};
+
+      \node (BPY) [blender_proc] at ($(Origin) + (-1.25, -7.1)$) {{\tightlabel{\mbox{Blender API (bpy)}}}};
+      \node (SceneData) [blender_proc] at ($(Origin) + (-1.5, -8.0)$) {{\tightlabel{\mbox{シーン状態データ}}}};
+      \node (BlenderEnv) [blender_proc] at ($(Origin) + (1.5, -8.0)$) {{\tightlabel{\mbox{ビューポート(GUI)}}}};
+      % --- Background Layers (subgraphs) ---
+      \begin{scope}[on background layer]
+          \node [group, fit=(Orchestrator) (Ollama), label={[group_label]north:{\tightlabel{\mbox{クライアント層}}}}] {};
+          \node [group, fit=(StaticDB) (DynamicDB), label={[group_label]north:{\tightlabel{\mbox{知識層}}}}] {};
+
+          \node (MCP_Box) [group, fit=(FastMCP) (T12) (T4) (SocketBridge), label={[group_label,xshift=-0.3cm, yshift=-0.1cm]north:{\tightlabel{\mbox{MCPサーバ}}}}] {};
+          \node [subgroup, fill=white, inner sep=2pt, fit=(T12) (T4)] {};
+
+          \node [group, fit=(SocketListener) (SceneData) (H_Insp) (H_Exec) (BPY), label={[group_label]south:{\tightlabel{\mbox{Blender実行環境}}}}] {};
+          \node [subgroup, fill=white, inner sep=2pt, fit=(SocketListener) (H_Insp) (H_Exec), label={[group_label,xshift=0cm,yshift=1cm]left:{\tightlabel{\mbox{\rotatebox{90}{}}}}}] {};
+      \end{scope}
+
+      % --- Connections ---
+      \draw [darrow] (Orchestrator) -- (Ollama);
+      \draw [arrow] (Ollama) -- (FastMCP);
+      \draw [arrow] (FastMCP) -- (T12);
+      \draw [arrow] (FastMCP) -- (T3);
+      \draw [arrow] (FastMCP) -- (T4.160);
+      \draw [arrow] (T3) -- (StaticDB.west);
+      \draw [darrow] (T4) -- (DynamicDB.south);
+      \draw [arrow] (T12) -- (SocketBridge);
+      \draw [arrow] (T3) -- (SocketBridge);
+      \draw [arrow] (T4) -- (SocketBridge);
+      \draw [darrow] (SocketBridge) -- (SocketListener);
+      \draw [arrow] (SocketListener) -- (Router);
+      \draw [arrow] (Router) -- (H_Exec);
+      \draw [darrow] (Router) -- (H_Insp);
+      \draw [arrow] (H_Exec) -- ([xshift=-0.25cm]BPY.north);
+      \draw [darrow] (H_Insp) -- ([xshift=0.3cm]BPY.north);
+      \draw [darrow] ([xshift=-0.25cm]BPY.south) -- (SceneData);
+      \draw [darrow] (SceneData) -- (BlenderEnv);
+\end{tikzpicture}
+
+\end{document}

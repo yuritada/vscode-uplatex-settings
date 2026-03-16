@@ -1,0 +1,63 @@
+\documentclass[dvipdfmx, border=5pt]{standalone}
+
+% フォント・数式関連
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath, amssymb}
+
+% TikZ関連
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc}
+
+% スタイル定義（色味は維持しつつシンプルに）
+\tikzset{
+    base/.style={rectangle, draw, rounded corners, inner sep=8pt, align=center, font=\sffamily\small, line width=0.8pt},
+    user/.style={base, fill=gray!10, draw=gray!70!black},
+    llm/.style={base, fill=blue!10, draw=blue!70!black, minimum width=3cm},
+    mcp/.style={base, fill=purple!10, draw=purple!70!black, minimum width=3cm},
+    blender/.style={base, fill=green!10, draw=green!70!black, minimum width=3cm},
+    storage/.style={base, fill=orange!10, draw=orange!70!black},
+    arrow/.style={-{Stealth[length=6pt, width=5pt]}, line width=0.8pt, draw=black!80},
+    darrow/.style={{Stealth[length=6pt, width=5pt]}-{Stealth[length=6pt, width=5pt]}, line width=0.8pt, draw=black!80},
+    dashed_arrow/.style={-{Stealth[length=6pt, width=5pt]}, dashed, line width=0.8pt, draw=black!80}
+}
+
+\begin{document}
+
+\begin{tikzpicture}[node distance=1.2cm]
+
+    % --- ノード配置 (上から下へ) ---
+    
+    % 1. ユーザ層
+    \node (User) [user] {ユーザ / プロンプト};
+
+    % 2. AIコア層 (LLM + Planner)
+    \node (AICore) [llm, below=of User] {AIコア\\(LLM \& Planner)};
+
+    % 3. MCP統合層 (Router + Tools)
+    \node (MCP) [mcp, below=of AICore] {MCP統合システム\\(Router \& Tools)};
+
+    % 4. Blender環境層 (API + Scene)
+    \node (Blender) [blender, below=of MCP] {Blender 3D環境\\(Python API \& GUI)};
+
+    % 5. 知識層 (DB) - サイドに配置
+    \node (Knowledge) [storage, right=1.5cm of MCP] {知識ベース\\(Static/Dynamic DB)};
+
+    % --- 接続 ---
+
+    % ユーザ -> AI
+    \draw [arrow] (User) -- (AICore);
+
+    % AI <-> MCP (命令と結果)
+    \draw [darrow] (AICore) -- (MCP);
+
+    % MCP -> Blender (実行)
+    \draw [darrow] (MCP) -- node[right, font=\scriptsize] {API操作} (Blender);
+
+    % DBとの連携 (MCPがツール経由でアクセス、あるいはAIが参照)
+    \draw [darrow] (MCP) -- (Knowledge);
+    \draw [dashed_arrow] (Knowledge) |- (AICore);
+
+\end{tikzpicture}
+
+\end{document}
